@@ -11,10 +11,9 @@ import {
 } from '@md/shared/configs'
 import { Moon, Sun, X } from 'lucide-vue-next'
 import PickColors from 'vue-pick-colors'
-import { useDisplayStore, useStore } from '@/stores'
+import { useStore } from '@/stores'
 
 const store = useStore()
-const displayStore = useDisplayStore()
 
 // 控制是否启用动画
 const enableAnimation = ref(false)
@@ -33,13 +32,6 @@ watch(() => store.isMobile, () => {
 })
 
 const { isDark, primaryColor } = storeToRefs(store)
-
-function customStyle() {
-  displayStore.toggleShowCssEditor()
-  setTimeout(() => {
-    store.cssEditor!.refresh()
-  }, 50)
-}
 
 const isOpen = ref(false)
 
@@ -280,25 +272,6 @@ const formatOptions = ref<Format[]>([`rgb`, `hex`, `hsl`, `hsv`])
             class="w-full" variant="outline" :class="{
               'border-black dark:border-white border-2': !store.isUseJustify,
             }" @click="store.isUseJustify && store.useJustifyChanged()"
-          >
-            关闭
-          </Button>
-        </div>
-      </div>
-      <div class="space-y-2">
-        <h2>自定义 CSS 面板</h2>
-        <div class="grid grid-cols-5 justify-items-center gap-2">
-          <Button
-            class="w-full" variant="outline" :class="{
-              'border-black dark:border-white border-2': displayStore.isShowCssEditor,
-            }" @click="!displayStore.isShowCssEditor && customStyle()"
-          >
-            开启
-          </Button>
-          <Button
-            class="w-full" variant="outline" :class="{
-              'border-black dark:border-white border-2': !displayStore.isShowCssEditor,
-            }" @click="displayStore.isShowCssEditor && customStyle()"
           >
             关闭
           </Button>

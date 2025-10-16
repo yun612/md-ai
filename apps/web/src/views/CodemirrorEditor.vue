@@ -5,6 +5,8 @@ import imageCompression from 'browser-image-compression'
 import { fromTextArea } from 'codemirror'
 import { Eye, Pen } from 'lucide-vue-next'
 import { SidebarAIToolbar } from '@/components/ai'
+import CursorStyleChatPanel from '@/components/ai/chat-box/CursorStyleChatPanel.vue'
+import TextSelectionFloating from '@/components/ai/TextSelectionFloating.vue'
 import {
   ResizableHandle,
   ResizablePanel,
@@ -44,6 +46,156 @@ const showEditor = ref(true)
 // 切换编辑/预览视图（仅限移动端）
 function toggleView() {
   showEditor.value = !showEditor.value
+}
+
+/* ---------- 全局文本选中悬浮 ---------- */
+const showTextFloating = ref(false)
+const selectedText = ref(``)
+const floatingPosition = ref({ x: 0, y: 0 })
+let selectionTimer: NodeJS.Timeout | null = null
+
+// 获取选中文本的精确位置
+function getSelectionPosition() {
+  const selection = window.getSelection()
+  console.log(`Selection object:`, selection)
+
+  if (!selection || selection.rangeCount === 0) {
+    console.log(`No selection or no ranges`)
+    return null
+  }
+
+  const range = selection.getRangeAt(0)
+  const text = range.toString().trim()
+  console.log(`Selected text:`, text)
+
+  if (!text || text.length === 0) {
+    console.log(`No text selected`)
+    return null
+  }
+
+  // 使用getBoundingClientRect()获取位置信息
+  const rect = range.getBoundingClientRect()
+  console.log(`Selection rect:`, rect)
+
+  if (rect.width === 0 && rect.height === 0) {
+    console.log(`Invalid rect dimensions`)
+    return null
+  }
+
+  return {
+    x: rect.left + rect.width / 2,
+    y: rect.top,
+    width: rect.width,
+    height: rect.height,
+    text,
+  }
+}
+
+// 处理文本选中事件（带防抖）
+function handleGlobalTextSelection() {
+  console.log(`handleGlobalTextSelection called`)
+
+  // 清除之前的定时器
+  if (selectionTimer) {
+    clearTimeout(selectionTimer)
+  }
+
+  // 设置防抖定时器
+  selectionTimer = setTimeout(() => {
+    const position = getSelectionPosition()
+    console.log(`Selection position:`, position)
+
+    if (position) {
+      selectedText.value = position.text
+      floatingPosition.value = {
+        x: position.x,
+        y: position.y,
+      }
+      showTextFloating.value = true
+      console.log(`Showing floating toolbar:`, { text: position.text, position: floatingPosition.value })
+    }
+    else {
+      showTextFloating.value = false
+      selectedText.value = ``
+      console.log(`Hiding floating toolbar`)
+    }
+  }, 50) // 50ms防抖，与豆包类似
+}
+
+// 处理selectionchange事件（更精确的监听）
+function handleSelectionChange() {
+  handleGlobalTextSelection()
+}
+
+// 处理悬浮工具栏的操作
+function handleFloatingAction(action: string, text: string) {
+  // 打开AI聊天面板
+  displayStore.toggleAIDialog(true)
+
+  // 根据操作类型设置不同的提示词
+  let prompt = ``
+  switch (action) {
+    case `copy`:
+      navigator.clipboard.writeText(text).catch((err) => {
+        console.error(`复制失败:`, err)
+      })
+      return // 复制操作不需要打开AI面板
+    case `polish`:
+      prompt = `请帮我润色以下文字，让它更加优雅和流畅：\n\n${text}`
+      break
+    case `rewrite`:
+      prompt = `请帮我重写以下文字，保持原意但使用不同的表达方式：\n\n${text}`
+      break
+    case `summarize`:
+      prompt = `请帮我总结以下内容：\n\n${text}`
+      break
+    case `translate`:
+      prompt = `请帮我翻译以下文字：\n\n${text}`
+      break
+    case `expand`:
+      prompt = `请帮我扩展以下内容，让它更加详细和丰富：\n\n${text}`
+      break
+  }
+
+  // 延迟设置输入内容，确保AI面板已经打开
+  nextTick(() => {
+    setTimeout(() => {
+      const textarea = document.querySelector(
+        `textarea[placeholder*="说些什么" ]`,
+      ) as HTMLTextAreaElement | null
+      if (textarea) {
+        textarea.value = prompt
+        textarea.focus()
+        textarea.setSelectionRange(textarea.value.length, textarea.value.length)
+      }
+    }, 100)
+  })
+
+  // 关闭悬浮工具栏
+  showTextFloating.value = false
+}
+
+function closeTextFloating() {
+  showTextFloating.value = false
+  selectedText.value = ``
+}
+
+// 测试函数
+function testFloating() {
+  console.log(`Testing floating toolbar`)
+  console.log(`Current state:`, {
+    showTextFloating: showTextFloating.value,
+    selectedText: selectedText.value,
+    floatingPosition: floatingPosition.value,
+  })
+  selectedText.value = `测试文本`
+  floatingPosition.value = { x: 300, y: 200 }
+  showTextFloating.value = true
+  console.log(`After setting:`, {
+    showTextFloating: showTextFloating.value,
+    selectedText: selectedText.value,
+    floatingPosition: floatingPosition.value,
+  })
 }
 
 // AI 工具箱已移到侧边栏
@@ -352,6 +504,10 @@ function createFormTextArea(dom: HTMLTextAreaElement) {
       editorRefresh()
 
       const currentPost = store.posts[store.currentPostIndex]
+      if (!currentPost) {
+        return
+      }
+
       const content = editor.getValue()
       if (content === currentPost.content) {
         return
@@ -406,7 +562,12 @@ onMounted(() => {
     return
   }
 
-  editorDom.value = store.posts[store.currentPostIndex].content
+  const currentPost = store.posts[store.currentPostIndex]
+  if (!currentPost) {
+    return
+  }
+
+  editorDom.value = currentPost.content
 
   nextTick(() => {
     editor.value = createFormTextArea(editorDom)
@@ -415,6 +576,12 @@ onMounted(() => {
     editorRefresh()
     mdLocalToRemote()
   })
+
+  // 添加全局文本选中事件监听器
+  console.log(`Adding event listeners for text selection`)
+  document.addEventListener(`mouseup`, handleGlobalTextSelection)
+  document.addEventListener(`selectionchange`, handleSelectionChange)
+  document.addEventListener(`keyup`, handleGlobalTextSelection) // 支持键盘选中
 })
 
 // 监听暗色模式变化并更新编辑器主题
@@ -429,6 +596,9 @@ onMounted(() => {
   // 定时，30 秒记录一次文章的历史记录
   historyTimer.value = setInterval(() => {
     const currentPost = store.posts[store.currentPostIndex]
+    if (!currentPost) {
+      return
+    }
 
     // 与最后一篇记录对比
     const pre = (currentPost.history || [])[0]?.content
@@ -455,18 +625,27 @@ onUnmounted(() => {
 
   // 清理全局事件监听器 - 防止全局事件触发已销毁的组件
   document.removeEventListener(`keydown`, handleGlobalKeydown)
+  document.removeEventListener(`mouseup`, handleGlobalTextSelection)
+  document.removeEventListener(`selectionchange`, handleSelectionChange)
+  document.removeEventListener(`keyup`, handleGlobalTextSelection)
+
+  // 清理定时器
+  if (selectionTimer) {
+    clearTimeout(selectionTimer)
+  }
 })
 </script>
 
 <template>
-  <div class="container flex flex-col">
-    <Progress v-model="progressValue" class="absolute left-0 right-0 rounded-none" style="height: 2px;" />
+  <div class="container flex flex-col" style="position: relative; z-index: 1;">
+    <Progress v-model="progressValue" class="absolute left-0 right-0 rounded-none" style="height: 2px; z-index: 2;" />
     <EditorHeader
+      style="position: relative; z-index: 100;"
       @start-copy="startCopy"
       @end-copy="endCopy"
     />
 
-    <main class="container-main flex flex-1 flex-col">
+    <main class="container-main flex flex-1 flex-col" style="position: relative; z-index: 1;">
       <div
         class="container-main-section border-radius-10 relative flex flex-1 overflow-hidden border"
       >
@@ -541,8 +720,16 @@ onUnmounted(() => {
 
               <FloatingToc />
             </div>
-            <CssEditor />
-            <RightSlider />
+            <RightSlider v-if="!displayStore.aiDialogVisible" />
+          </ResizablePanel>
+          <ResizableHandle v-if="displayStore.aiDialogVisible" class="hidden md:block" />
+          <ResizablePanel
+            v-if="displayStore.aiDialogVisible"
+            :default-size="30"
+            :min-size="20"
+            :max-size="50"
+          >
+            <CursorStyleChatPanel v-model:open="displayStore.aiDialogVisible" />
           </ResizablePanel>
         </ResizablePanelGroup>
       </div>
@@ -556,6 +743,16 @@ onUnmounted(() => {
           @click="toggleView"
         >
           <component :is="showEditor ? Eye : Pen" class="h-5 w-5" />
+        </button>
+      </div>
+
+      <!-- 测试按钮 -->
+      <div class="fixed top-4 right-4 z-40">
+        <button
+          class="bg-red-500 text-white px-4 py-2 rounded shadow-lg"
+          @click="testFloating"
+        >
+          测试悬浮
         </button>
       </div>
 
@@ -586,6 +783,15 @@ onUnmounted(() => {
     </main>
 
     <Footer />
+
+    <!-- 全局文本选中悬浮组件 -->
+    <TextSelectionFloating
+      :visible="showTextFloating"
+      :selected-text="selectedText"
+      :position="floatingPosition"
+      @close="closeTextFloating"
+      @action="handleFloatingAction"
+    />
   </div>
 </template>
 

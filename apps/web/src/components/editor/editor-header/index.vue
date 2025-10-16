@@ -192,6 +192,7 @@ async function copy() {
 <template>
   <header
     class="header-container h-15 flex flex-wrap items-center justify-between px-5 relative"
+    style="pointer-events: auto; z-index: 100;"
   >
     <!-- 桌面端左侧菜单 -->
     <div class="space-x-2 hidden md:flex">

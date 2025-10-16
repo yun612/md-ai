@@ -9,7 +9,7 @@ import {
   themeOptions,
 } from '@md/shared/configs'
 import PickColors from 'vue-pick-colors'
-import { useDisplayStore, useStore } from '@/stores'
+import { useStore } from '@/stores'
 
 const props = withDefaults(defineProps<{
   asSub?: boolean
@@ -20,7 +20,6 @@ const props = withDefaults(defineProps<{
 const { asSub } = toRefs(props)
 
 const store = useStore()
-const { toggleShowCssEditor } = useDisplayStore()
 
 const {
   theme,
@@ -30,7 +29,6 @@ const {
   codeBlockTheme,
   legend,
   isMacCodeBlock,
-  cssEditor,
 } = storeToRefs(store)
 
 const {
@@ -50,12 +48,10 @@ function showPicker() {
   colorPicker.value?.show()
 }
 
-// 自定义CSS样式
+// 自定义CSS样式 - 已移除CSS编辑器
 function customStyle() {
-  toggleShowCssEditor()
-  setTimeout(() => {
-    cssEditor.value!.refresh()
-  }, 50)
+  // CSS编辑器已移除，此功能不再可用
+  console.log(`CSS编辑器已移除`)
 }
 
 const pickColorsContainer = useTemplateRef(`pickColorsContainer`)

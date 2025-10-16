@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { Bot, Image as ImageIcon, Settings2, Wand2 } from 'lucide-vue-next'
 import { useDisplayStore } from '@/stores'
-import AIAssistantPanel from './chat-box/AIAssistantPanel.vue'
 import AIImageGeneratorPanel from './image-generator/AIImageGeneratorPanel.vue'
 import { AIPolishPopover } from './tool-box'
 
@@ -11,7 +10,7 @@ defineProps<{
 }>()
 
 const displayStore = useDisplayStore()
-const { aiDialogVisible, aiImageDialogVisible } = storeToRefs(displayStore)
+const { aiImageDialogVisible } = storeToRefs(displayStore)
 const { toggleAIDialog, toggleAIImageDialog } = displayStore
 
 const store = useStore()
@@ -95,6 +94,9 @@ onMounted(() => {
       `.floating`,
       `.ai-assistant-panel`,
       `.ai-image-generator-panel`,
+      `[data-radix-menubar-content]`,
+      `[data-radix-dropdown-menu-content]`,
+      `[data-radix-select-content]`,
     ]
 
     const shouldNotCollapse = excludeSelectors.some(selector => target.closest(selector))
@@ -201,7 +203,6 @@ onMounted(() => {
     </div>
 
     <!-- AI面板组件 -->
-    <AIAssistantPanel v-model:open="aiDialogVisible" />
     <AIImageGeneratorPanel v-model:open="aiImageDialogVisible" />
 
     <!-- AI工具箱弹窗 -->

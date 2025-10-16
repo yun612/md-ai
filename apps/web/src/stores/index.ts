@@ -1,16 +1,15 @@
+import type CodeMirror from 'codemirror'
 import { initRenderer } from '@md/core'
 import {
   defaultStyleConfig,
   themeMap,
   widthOptions,
 } from '@md/shared/configs'
-import CodeMirror from 'codemirror'
 import { toPng } from 'html-to-image'
 import { v4 as uuid } from 'uuid'
 import DEFAULT_CONTENT from '@/assets/example/markdown.md?raw'
 
 import DEFAULT_CSS_CONTENT from '@/assets/example/theme-css.txt?raw'
-import { altKey, shiftKey } from '@/configs/shortcut-key'
 import {
   addPrefix,
   css2json,
@@ -424,53 +423,9 @@ export const useStore = defineStore(`store`, () => {
 
     editorRefresh()
   }
-  // 初始化 CSS 编辑器
-  onMounted(() => {
-    const cssEditorDom = document.querySelector<HTMLTextAreaElement>(
-      `#cssEditor`,
-    )!
-    cssEditorDom.value = getCurrentTab().content
-    const theme = isDark.value ? `darcula` : `xq-light`
-    cssEditor.value = markRaw(
-      CodeMirror.fromTextArea(cssEditorDom, {
-        mode: `css`,
-        theme,
-        lineNumbers: false,
-        lineWrapping: true,
-        styleActiveLine: true,
-        matchBrackets: true,
-        autofocus: true,
-        extraKeys: {
-          [`${shiftKey}-${altKey}-F`]: function autoFormat(
-            editor: CodeMirror.Editor,
-          ) {
-            formatDoc(editor.getValue(), `css`).then((doc) => {
-              getCurrentTab().content = doc
-              editor.setValue(doc)
-            })
-          },
-        },
-      } as never),
-    )
+  // CSS 编辑器已移除，不再需要初始化
 
-    // 自动提示
-    cssEditor.value.on(`keyup`, (cm, e) => {
-      if ((e.keyCode >= 65 && e.keyCode <= 90) || e.keyCode === 189) {
-        (cm as any).showHint(e)
-      }
-    })
-
-    // 实时保存
-    cssEditor.value.on(`update`, () => {
-      updateCss()
-      getCurrentTab().content = cssEditor.value!.getValue()
-    })
-  })
-
-  watch(isDark, () => {
-    const theme = isDark.value ? `darcula` : `xq-light`
-    toRaw(cssEditor.value)?.setOption?.(`theme`, theme)
-  })
+  // CSS 编辑器已移除，不再需要监听主题变化
 
   // 重置样式
   const resetStyle = () => {

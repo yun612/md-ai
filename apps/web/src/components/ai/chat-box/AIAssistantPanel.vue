@@ -560,7 +560,7 @@ async function sendMessage() {
             v-model="input"
             placeholder="说些什么… (Enter 发送，Shift+Enter 换行)"
             rows="2"
-            class="custom-scroll min-h-16 w-full resize-none border-none bg-transparent p-0 focus-visible:outline-hidden focus:outline-hidden focus-visible:ring-0 focus:ring-0 focus-visible:ring-offset-0 focus:ring-offset-0 focus-visible:ring-transparent focus:ring-transparent"
+            class="custom-scroll min-h-16 w-full resize-none focus:outline-none border-none bg-transparent p-0 focus-visible:outline-hidden focus:outline-hidden focus-visible:ring-0 focus:ring-0 focus-visible:ring-offset-0 focus:ring-offset-0 focus-visible:ring-transparent focus:ring-transparent"
             @keydown="handleKeydown"
           />
 
