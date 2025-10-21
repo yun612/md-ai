@@ -81,7 +81,6 @@ const actions: FloatingAction[] = [
 ]
 
 const displayPosition = computed(() => {
-  console.log(`Computing display position:`, { visible: props.visible, position: props.position })
   if (!props.visible)
     return { x: -9999, y: -9999 }
 
@@ -99,7 +98,6 @@ const displayPosition = computed(() => {
   if (y < 10)
     y = props.position.y + 30 // 显示在下方
 
-  console.log(`Final position:`, { x, y })
   return { x, y }
 })
 
@@ -197,11 +195,6 @@ onUnmounted(() => {
 
 <template>
   <Teleport to="body">
-    <!-- 调试信息 -->
-    <div v-if="visible" class="fixed top-0 left-0 bg-red-500 text-white p-2 z-[10000] text-xs">
-      Debug: visible={{ visible }}, text={{ selectedText }}, pos={{ position }}
-    </div>
-
     <div
       v-if="visible"
       ref="floatingRef"

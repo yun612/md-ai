@@ -11,6 +11,7 @@ import {
 } from '@md/shared/configs'
 import { Moon, Sun, X } from 'lucide-vue-next'
 import PickColors from 'vue-pick-colors'
+import AITemplateGenerator from '@/components/ai/AITemplateGenerator.vue'
 import { useStore } from '@/stores'
 
 const store = useStore()
@@ -46,6 +47,9 @@ watch(isOpen, () => {
 const pickColorsContainer = useTemplateRef<HTMLElement | undefined>(`pickColorsContainer`)
 const format = ref<Format>(`rgb`)
 const formatOptions = ref<Format[]>([`rgb`, `hex`, `hsl`, `hsv`])
+
+// 标签页状态
+const activeTab = ref(`settings`)
 </script>
 
 <template>
@@ -85,253 +89,281 @@ const formatOptions = ref<Format[]>([`rgb`, `hex`, `hsl`, `hsv`])
       <!-- 移动端标题栏 -->
       <div v-if="store.isMobile" class="sticky top-0 z-10 flex items-center justify-between -mx-4 px-4 py-3 border-b mb-4 bg-background">
         <h2 class="text-lg font-semibold">
-          样式设置
+          设置面板
         </h2>
         <Button variant="ghost" size="sm" @click="store.isOpenRightSlider = false">
           <X class="h-4 w-4" />
         </Button>
       </div>
-      <div class="space-y-2">
-        <h2>主题</h2>
-        <div class="grid grid-cols-3 justify-items-center gap-2">
-          <Button
-            v-for="{ label, value } in themeOptions" :key="value" class="w-full" variant="outline" :class="{
-              'border-black dark:border-white border-2': store.theme === value,
-            }" @click="store.themeChanged(value)"
-          >
-            {{ label }}
-          </Button>
-        </div>
+
+      <!-- 标签页导航 -->
+      <div class="flex border-b border-gray-200 dark:border-gray-700 mb-4">
+        <button
+          v-for="tab in [
+            { id: 'settings', name: '样式设置' },
+            { id: 'ai-templates', name: 'AI模板' },
+          ]"
+          :key="tab.id"
+          class="px-4 py-2 text-sm font-medium border-b-2 transition-colors" :class="[
+            activeTab === tab.id
+              ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+              : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300',
+          ]"
+          @click="activeTab = tab.id"
+        >
+          {{ tab.name }}
+        </button>
       </div>
-      <div class="space-y-2">
-        <h2>字体</h2>
-        <div class="grid grid-cols-3 justify-items-center gap-2">
-          <Button
-            v-for="{ label, value } in fontFamilyOptions" :key="value" variant="outline" class="w-full"
-            :class="{ 'border-black dark:border-white border-2': store.fontFamily === value }" @click="store.fontChanged(value)"
-          >
-            {{ label }}
-          </Button>
+
+      <!-- 样式设置标签页 -->
+      <div v-if="activeTab === 'settings'" class="space-y-4">
+        <div class="space-y-2">
+          <h2>主题</h2>
+          <div class="grid grid-cols-3 justify-items-center gap-2">
+            <Button
+              v-for="{ label, value } in themeOptions" :key="value" class="w-full" variant="outline" :class="{
+                'border-black dark:border-white border-2': store.theme === value,
+              }" @click="store.themeChanged(value)"
+            >
+              {{ label }}
+            </Button>
+          </div>
         </div>
-      </div>
-      <div class="space-y-2">
-        <h2>字号</h2>
-        <div class="grid grid-cols-5 justify-items-center gap-2">
-          <Button
-            v-for="{ value, desc } in fontSizeOptions" :key="value" variant="outline" class="w-full" :class="{
-              'border-black dark:border-white border-2': store.fontSize === value,
-            }" @click="store.sizeChanged(value)"
-          >
-            {{ desc }}
-          </Button>
+        <div class="space-y-2">
+          <h2>字体</h2>
+          <div class="grid grid-cols-3 justify-items-center gap-2">
+            <Button
+              v-for="{ label, value } in fontFamilyOptions" :key="value" variant="outline" class="w-full"
+              :class="{ 'border-black dark:border-white border-2': store.fontFamily === value }" @click="store.fontChanged(value)"
+            >
+              {{ label }}
+            </Button>
+          </div>
         </div>
-      </div>
-      <div class="space-y-2">
-        <h2>主题色</h2>
-        <div class="grid grid-cols-3 justify-items-center gap-2">
-          <Button
-            v-for="{ label, value } in colorOptions" :key="value" class="w-full" variant="outline" :class="{
-              'border-black dark:border-white border-2': store.primaryColor === value,
-            }" @click="store.colorChanged(value)"
-          >
-            <span
-              class="mr-2 inline-block h-4 w-4 rounded-full" :style="{
-                background: value,
-              }"
+        <div class="space-y-2">
+          <h2>字号</h2>
+          <div class="grid grid-cols-5 justify-items-center gap-2">
+            <Button
+              v-for="{ value, desc } in fontSizeOptions" :key="value" variant="outline" class="w-full" :class="{
+                'border-black dark:border-white border-2': store.fontSize === value,
+              }" @click="store.sizeChanged(value)"
+            >
+              {{ desc }}
+            </Button>
+          </div>
+        </div>
+        <div class="space-y-2">
+          <h2>主题色</h2>
+          <div class="grid grid-cols-3 justify-items-center gap-2">
+            <Button
+              v-for="{ label, value } in colorOptions" :key="value" class="w-full" variant="outline" :class="{
+                'border-black dark:border-white border-2': store.primaryColor === value,
+              }" @click="store.colorChanged(value)"
+            >
+              <span
+                class="mr-2 inline-block h-4 w-4 rounded-full" :style="{
+                  background: value,
+                }"
+              />
+              {{ label }}
+            </Button>
+          </div>
+        </div>
+        <div class="space-y-2">
+          <h2>自定义主题色</h2>
+          <div ref="pickColorsContainer">
+            <PickColors
+              v-if="pickColorsContainer" v-model:value="primaryColor" show-alpha :format="format"
+              :format-options="formatOptions" :theme="store.isDark ? 'dark' : 'light'"
+              :popup-container="pickColorsContainer" @change="store.colorChanged"
             />
-            {{ label }}
-          </Button>
+          </div>
         </div>
-      </div>
-      <div class="space-y-2">
-        <h2>自定义主题色</h2>
-        <div ref="pickColorsContainer">
-          <PickColors
-            v-if="pickColorsContainer" v-model:value="primaryColor" show-alpha :format="format"
-            :format-options="formatOptions" :theme="store.isDark ? 'dark' : 'light'"
-            :popup-container="pickColorsContainer" @change="store.colorChanged"
-          />
+        <div class="space-y-2">
+          <h2>代码块主题</h2>
+          <div>
+            <Select v-model="store.codeBlockTheme" @update:model-value="store.codeBlockThemeChanged">
+              <SelectTrigger>
+                <SelectValue placeholder="Select a code block theme" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem v-for="{ label, value } in codeBlockThemeOptions" :key="label" :value="value">
+                  {{ label }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
-      </div>
-      <div class="space-y-2">
-        <h2>代码块主题</h2>
-        <div>
-          <Select v-model="store.codeBlockTheme" @update:model-value="store.codeBlockThemeChanged">
-            <SelectTrigger>
-              <SelectValue placeholder="Select a code block theme" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem v-for="{ label, value } in codeBlockThemeOptions" :key="label" :value="value">
-                {{ label }}
-              </SelectItem>
-            </SelectContent>
-          </Select>
+        <div class="space-y-2">
+          <h2>图注格式</h2>
+          <div class="grid grid-cols-3 justify-items-center gap-2">
+            <Button
+              v-for="{ label, value } in legendOptions" :key="value" class="w-full" variant="outline" :class="{
+                'border-black dark:border-white border-2': store.legend === value,
+              }" @click="store.legendChanged(value)"
+            >
+              {{ label }}
+            </Button>
+          </div>
         </div>
-      </div>
-      <div class="space-y-2">
-        <h2>图注格式</h2>
-        <div class="grid grid-cols-3 justify-items-center gap-2">
-          <Button
-            v-for="{ label, value } in legendOptions" :key="value" class="w-full" variant="outline" :class="{
-              'border-black dark:border-white border-2': store.legend === value,
-            }" @click="store.legendChanged(value)"
-          >
-            {{ label }}
+
+        <div class="space-y-2">
+          <h2>Mac 代码块</h2>
+          <div class="grid grid-cols-5 justify-items-center gap-2">
+            <Button
+              class="w-full" variant="outline" :class="{
+                'border-black dark:border-white border-2': store.isMacCodeBlock,
+              }" @click="!store.isMacCodeBlock && store.macCodeBlockChanged()"
+            >
+              开启
+            </Button>
+            <Button
+              class="w-full" variant="outline" :class="{
+                'border-black dark:border-white border-2': !store.isMacCodeBlock,
+              }" @click="store.isMacCodeBlock && store.macCodeBlockChanged()"
+            >
+              关闭
+            </Button>
+          </div>
+        </div>
+        <div class="space-y-2">
+          <h2>代码块行号</h2>
+          <div class="grid grid-cols-5 justify-items-center gap-2">
+            <Button
+              class="w-full" variant="outline" :class="{
+                'border-black dark:border-white border-2': store.isShowLineNumber,
+              }" @click="!store.isShowLineNumber && store.showLineNumberChanged()"
+            >
+              开启
+            </Button>
+            <Button
+              class="w-full" variant="outline" :class="{
+                'border-black dark:border-white border-2': !store.isShowLineNumber,
+              }" @click="store.isShowLineNumber && store.showLineNumberChanged()"
+            >
+              关闭
+            </Button>
+          </div>
+        </div>
+
+        <div class="space-y-2">
+          <h2>微信外链转底部引用</h2>
+          <div class="grid grid-cols-5 justify-items-center gap-2">
+            <Button
+              class="w-full" variant="outline" :class="{
+                'border-black dark:border-white border-2': store.isCiteStatus,
+              }" @click="!store.isCiteStatus && store.citeStatusChanged()"
+            >
+              开启
+            </Button>
+            <Button
+              class="w-full" variant="outline" :class="{
+                'border-black dark:border-white border-2': !store.isCiteStatus,
+              }" @click="store.isCiteStatus && store.citeStatusChanged()"
+            >
+              关闭
+            </Button>
+          </div>
+        </div>
+        <div class="space-y-2">
+          <h2>段落首行缩进</h2>
+          <div class="grid grid-cols-5 justify-items-center gap-2">
+            <Button
+              class="w-full" variant="outline" :class="{
+                'border-black dark:border-white border-2': store.isUseIndent,
+              }" @click="!store.isUseIndent && store.useIndentChanged()"
+            >
+              开启
+            </Button>
+            <Button
+              class="w-full" variant="outline" :class="{
+                'border-black dark:border-white border-2': !store.isUseIndent,
+              }" @click="store.isUseIndent && store.useIndentChanged()"
+            >
+              关闭
+            </Button>
+          </div>
+        </div>
+        <div class="space-y-2">
+          <h2>段落两端对齐</h2>
+          <div class="grid grid-cols-5 justify-items-center gap-2">
+            <Button
+              class="w-full" variant="outline" :class="{
+                'border-black dark:border-white border-2': store.isUseJustify,
+              }" @click="!store.isUseJustify && store.useJustifyChanged()"
+            >
+              开启
+            </Button>
+            <Button
+              class="w-full" variant="outline" :class="{
+                'border-black dark:border-white border-2': !store.isUseJustify,
+              }" @click="store.isUseJustify && store.useJustifyChanged()"
+            >
+              关闭
+            </Button>
+          </div>
+        </div>
+        <div class="space-y-2">
+          <h2>编辑区位置</h2>
+          <div class="grid grid-cols-5 justify-items-center gap-2">
+            <Button
+              class="w-full" variant="outline" :class="{
+                'border-black dark:border-white border-2': store.isEditOnLeft,
+              }" @click="!store.isEditOnLeft && store.toggleEditOnLeft()"
+            >
+              左侧
+            </Button>
+            <Button
+              class="w-full" variant="outline" :class="{
+                'border-black dark:border-white border-2': !store.isEditOnLeft,
+              }" @click="store.isEditOnLeft && store.toggleEditOnLeft()"
+            >
+              右侧
+            </Button>
+          </div>
+        </div>
+        <div class="space-y-2">
+          <h2>预览模式</h2>
+          <div class="grid grid-cols-5 justify-items-center gap-2">
+            <Button
+              v-for="{ label, value } in widthOptions" :key="value" class="w-full" variant="outline" :class="{
+                'border-black dark:border-white border-2': store.previewWidth === value,
+              }" @click="store.previewWidthChanged(value)"
+            >
+              {{ label }}
+            </Button>
+          </div>
+        </div>
+        <div class="space-y-2">
+          <h2>模式</h2>
+          <div class="grid grid-cols-5 justify-items-center gap-2">
+            <Button
+              class="w-full" variant="outline" :class="{
+                'border-black dark:border-white border-2': !isDark,
+              }" @click="store.toggleDark(false)"
+            >
+              <Sun class="h-4 w-4" />
+            </Button>
+            <Button
+              class="w-full" variant="outline" :class="{
+                'border-black dark:border-white border-2': isDark,
+              }" @click="store.toggleDark(true)"
+            >
+              <Moon class="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+        <div class="space-y-2">
+          <h2>样式配置</h2>
+          <Button variant="destructive" @click="store.resetStyleConfirm">
+            重置
           </Button>
         </div>
       </div>
 
-      <div class="space-y-2">
-        <h2>Mac 代码块</h2>
-        <div class="grid grid-cols-5 justify-items-center gap-2">
-          <Button
-            class="w-full" variant="outline" :class="{
-              'border-black dark:border-white border-2': store.isMacCodeBlock,
-            }" @click="!store.isMacCodeBlock && store.macCodeBlockChanged()"
-          >
-            开启
-          </Button>
-          <Button
-            class="w-full" variant="outline" :class="{
-              'border-black dark:border-white border-2': !store.isMacCodeBlock,
-            }" @click="store.isMacCodeBlock && store.macCodeBlockChanged()"
-          >
-            关闭
-          </Button>
-        </div>
-      </div>
-      <div class="space-y-2">
-        <h2>代码块行号</h2>
-        <div class="grid grid-cols-5 justify-items-center gap-2">
-          <Button
-            class="w-full" variant="outline" :class="{
-              'border-black dark:border-white border-2': store.isShowLineNumber,
-            }" @click="!store.isShowLineNumber && store.showLineNumberChanged()"
-          >
-            开启
-          </Button>
-          <Button
-            class="w-full" variant="outline" :class="{
-              'border-black dark:border-white border-2': !store.isShowLineNumber,
-            }" @click="store.isShowLineNumber && store.showLineNumberChanged()"
-          >
-            关闭
-          </Button>
-        </div>
-      </div>
-
-      <div class="space-y-2">
-        <h2>微信外链转底部引用</h2>
-        <div class="grid grid-cols-5 justify-items-center gap-2">
-          <Button
-            class="w-full" variant="outline" :class="{
-              'border-black dark:border-white border-2': store.isCiteStatus,
-            }" @click="!store.isCiteStatus && store.citeStatusChanged()"
-          >
-            开启
-          </Button>
-          <Button
-            class="w-full" variant="outline" :class="{
-              'border-black dark:border-white border-2': !store.isCiteStatus,
-            }" @click="store.isCiteStatus && store.citeStatusChanged()"
-          >
-            关闭
-          </Button>
-        </div>
-      </div>
-      <div class="space-y-2">
-        <h2>段落首行缩进</h2>
-        <div class="grid grid-cols-5 justify-items-center gap-2">
-          <Button
-            class="w-full" variant="outline" :class="{
-              'border-black dark:border-white border-2': store.isUseIndent,
-            }" @click="!store.isUseIndent && store.useIndentChanged()"
-          >
-            开启
-          </Button>
-          <Button
-            class="w-full" variant="outline" :class="{
-              'border-black dark:border-white border-2': !store.isUseIndent,
-            }" @click="store.isUseIndent && store.useIndentChanged()"
-          >
-            关闭
-          </Button>
-        </div>
-      </div>
-      <div class="space-y-2">
-        <h2>段落两端对齐</h2>
-        <div class="grid grid-cols-5 justify-items-center gap-2">
-          <Button
-            class="w-full" variant="outline" :class="{
-              'border-black dark:border-white border-2': store.isUseJustify,
-            }" @click="!store.isUseJustify && store.useJustifyChanged()"
-          >
-            开启
-          </Button>
-          <Button
-            class="w-full" variant="outline" :class="{
-              'border-black dark:border-white border-2': !store.isUseJustify,
-            }" @click="store.isUseJustify && store.useJustifyChanged()"
-          >
-            关闭
-          </Button>
-        </div>
-      </div>
-      <div class="space-y-2">
-        <h2>编辑区位置</h2>
-        <div class="grid grid-cols-5 justify-items-center gap-2">
-          <Button
-            class="w-full" variant="outline" :class="{
-              'border-black dark:border-white border-2': store.isEditOnLeft,
-            }" @click="!store.isEditOnLeft && store.toggleEditOnLeft()"
-          >
-            左侧
-          </Button>
-          <Button
-            class="w-full" variant="outline" :class="{
-              'border-black dark:border-white border-2': !store.isEditOnLeft,
-            }" @click="store.isEditOnLeft && store.toggleEditOnLeft()"
-          >
-            右侧
-          </Button>
-        </div>
-      </div>
-      <div class="space-y-2">
-        <h2>预览模式</h2>
-        <div class="grid grid-cols-5 justify-items-center gap-2">
-          <Button
-            v-for="{ label, value } in widthOptions" :key="value" class="w-full" variant="outline" :class="{
-              'border-black dark:border-white border-2': store.previewWidth === value,
-            }" @click="store.previewWidthChanged(value)"
-          >
-            {{ label }}
-          </Button>
-        </div>
-      </div>
-      <div class="space-y-2">
-        <h2>模式</h2>
-        <div class="grid grid-cols-5 justify-items-center gap-2">
-          <Button
-            class="w-full" variant="outline" :class="{
-              'border-black dark:border-white border-2': !isDark,
-            }" @click="store.toggleDark(false)"
-          >
-            <Sun class="h-4 w-4" />
-          </Button>
-          <Button
-            class="w-full" variant="outline" :class="{
-              'border-black dark:border-white border-2': isDark,
-            }" @click="store.toggleDark(true)"
-          >
-            <Moon class="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
-      <div class="space-y-2">
-        <h2>样式配置</h2>
-        <Button variant="destructive" @click="store.resetStyleConfirm">
-          重置
-        </Button>
+      <!-- AI模板生成器标签页 -->
+      <div v-if="activeTab === 'ai-templates'">
+        <AITemplateGenerator />
       </div>
     </div>
   </div>

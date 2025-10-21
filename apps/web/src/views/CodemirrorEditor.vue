@@ -57,28 +57,22 @@ let selectionTimer: NodeJS.Timeout | null = null
 // 获取选中文本的精确位置
 function getSelectionPosition() {
   const selection = window.getSelection()
-  console.log(`Selection object:`, selection)
 
   if (!selection || selection.rangeCount === 0) {
-    console.log(`No selection or no ranges`)
     return null
   }
 
   const range = selection.getRangeAt(0)
   const text = range.toString().trim()
-  console.log(`Selected text:`, text)
 
   if (!text || text.length === 0) {
-    console.log(`No text selected`)
     return null
   }
 
   // 使用getBoundingClientRect()获取位置信息
   const rect = range.getBoundingClientRect()
-  console.log(`Selection rect:`, rect)
 
   if (rect.width === 0 && rect.height === 0) {
-    console.log(`Invalid rect dimensions`)
     return null
   }
 
@@ -93,8 +87,6 @@ function getSelectionPosition() {
 
 // 处理文本选中事件（带防抖）
 function handleGlobalTextSelection() {
-  console.log(`handleGlobalTextSelection called`)
-
   // 清除之前的定时器
   if (selectionTimer) {
     clearTimeout(selectionTimer)
@@ -103,7 +95,6 @@ function handleGlobalTextSelection() {
   // 设置防抖定时器
   selectionTimer = setTimeout(() => {
     const position = getSelectionPosition()
-    console.log(`Selection position:`, position)
 
     if (position) {
       selectedText.value = position.text
@@ -112,12 +103,10 @@ function handleGlobalTextSelection() {
         y: position.y,
       }
       showTextFloating.value = true
-      console.log(`Showing floating toolbar:`, { text: position.text, position: floatingPosition.value })
     }
     else {
       showTextFloating.value = false
       selectedText.value = ``
-      console.log(`Hiding floating toolbar`)
     }
   }, 50) // 50ms防抖，与豆包类似
 }
@@ -178,24 +167,6 @@ function handleFloatingAction(action: string, text: string) {
 function closeTextFloating() {
   showTextFloating.value = false
   selectedText.value = ``
-}
-
-// 测试函数
-function testFloating() {
-  console.log(`Testing floating toolbar`)
-  console.log(`Current state:`, {
-    showTextFloating: showTextFloating.value,
-    selectedText: selectedText.value,
-    floatingPosition: floatingPosition.value,
-  })
-  selectedText.value = `测试文本`
-  floatingPosition.value = { x: 300, y: 200 }
-  showTextFloating.value = true
-  console.log(`After setting:`, {
-    showTextFloating: showTextFloating.value,
-    selectedText: selectedText.value,
-    floatingPosition: floatingPosition.value,
-  })
 }
 
 // AI 工具箱已移到侧边栏
@@ -578,7 +549,6 @@ onMounted(() => {
   })
 
   // 添加全局文本选中事件监听器
-  console.log(`Adding event listeners for text selection`)
   document.addEventListener(`mouseup`, handleGlobalTextSelection)
   document.addEventListener(`selectionchange`, handleSelectionChange)
   document.addEventListener(`keyup`, handleGlobalTextSelection) // 支持键盘选中
@@ -743,16 +713,6 @@ onUnmounted(() => {
           @click="toggleView"
         >
           <component :is="showEditor ? Eye : Pen" class="h-5 w-5" />
-        </button>
-      </div>
-
-      <!-- 测试按钮 -->
-      <div class="fixed top-4 right-4 z-40">
-        <button
-          class="bg-red-500 text-white px-4 py-2 rounded shadow-lg"
-          @click="testFloating"
-        >
-          测试悬浮
         </button>
       </div>
 
