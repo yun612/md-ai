@@ -26,6 +26,10 @@ export const useUIStore = defineStore(`ui`, () => {
   // 是否打开文章列表滑块
   const isOpenPostSlider = useStorage(addPrefix(`is_open_post_slider`), false)
 
+  // 是否打开AI助手面板
+  const isOpenAIPanel = useStorage(addPrefix(`is_open_ai_panel`), false)
+  const toggleAIPanel = useToggle(isOpenAIPanel)
+
   // 是否为移动端
   const isMobile = useStorage(`isMobile`, false)
 
@@ -54,6 +58,7 @@ export const useUIStore = defineStore(`ui`, () => {
     hasShownAIToolboxHint,
     isOpenRightSlider,
     isOpenPostSlider,
+    isOpenAIPanel,
     isMobile,
     isOpenConfirmDialog,
 
@@ -61,5 +66,6 @@ export const useUIStore = defineStore(`ui`, () => {
     toggleDark,
     toggleEditOnLeft,
     toggleAIToolbox,
+    toggleAIPanel,
   }
 })

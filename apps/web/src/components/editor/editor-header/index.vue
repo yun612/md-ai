@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ChevronDownIcon, Menu, Palette, SlidersHorizontal } from 'lucide-vue-next'
+import { Bot, ChevronDownIcon, Menu, Palette, SlidersHorizontal } from 'lucide-vue-next'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useDisplayStore } from '@/stores/display'
 import { useEditorStore } from '@/stores/editor'
@@ -22,7 +22,8 @@ const displayStore = useDisplayStore()
 const { editor } = storeToRefs(editorStore)
 const { output } = storeToRefs(renderStore)
 const { primaryColor } = storeToRefs(themeStore)
-const { isOpenRightSlider } = storeToRefs(uiStore)
+const { isOpenRightSlider, isOpenAIPanel } = storeToRefs(uiStore)
+const { toggleAIPanel } = uiStore
 
 // Editor refresh function
 function editorRefresh() {
@@ -303,6 +304,16 @@ async function copy() {
           <ThemeCustomizer />
         </PopoverContent>
       </Popover>
+
+      <!-- AI助手面板 -->
+      <Button
+        variant="outline"
+        size="icon"
+        :class="{ 'bg-primary text-primary-foreground': isOpenAIPanel }"
+        @click="toggleAIPanel()"
+      >
+        <Bot class="size-4" />
+      </Button>
 
       <!-- 样式面板 -->
       <Button

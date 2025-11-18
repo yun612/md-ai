@@ -51,12 +51,12 @@ watch(endpoint, () => {
 
 function saveConfig() {
   if (!endpoint.value.trim() || !model.value.trim()) {
-    testResult.value = `❌ 请检查配置项是否完整`
+    testResult.value = `请检查配置项是否完整`
     return
   }
 
   if (type.value !== DEFAULT_SERVICE_TYPE && !apiKey.value.trim()) {
-    testResult.value = `❌ 请输入 API Key`
+    testResult.value = `请输入 API Key`
     return
   }
 
@@ -65,17 +65,17 @@ function saveConfig() {
     new URL(endpoint.value)
   }
   catch {
-    testResult.value = `❌ 端点格式有误`
+    testResult.value = `端点格式有误`
     return
   }
 
-  testResult.value = `✅ 配置已保存`
+  testResult.value = `配置已保存`
   emit(`saved`)
 }
 
 function clearConfig() {
   AIImageConfigStore.reset()
-  testResult.value = `🗑️ 当前 AI 图像配置已清除`
+  testResult.value = `当前 AI 图像配置已清除`
 }
 
 async function testConnection() {
@@ -108,15 +108,15 @@ async function testConnection() {
     })
 
     if (res.ok) {
-      testResult.value = `✅ 连接成功`
+      testResult.value = `连接成功`
     }
     else {
       const errorText = await res.text()
-      testResult.value = `❌ 连接失败：${res.status} ${errorText}`
+      testResult.value = `连接失败：${res.status} ${errorText}`
     }
   }
   catch (error) {
-    testResult.value = `❌ 连接失败：${(error as Error).message}`
+    testResult.value = `连接失败：${(error as Error).message}`
   }
   finally {
     loading.value = false

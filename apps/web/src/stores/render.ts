@@ -1,6 +1,7 @@
 import { initRenderer } from '@md/core'
 import { themeMap } from '@md/shared/configs'
 import { css2json, customCssWithTemplate, customizeTheme, postProcessHtml, renderMarkdown } from '@/utils'
+import { useHeadingTemplateStore } from './headingTemplate'
 import { useThemeStore } from './theme'
 
 /**
@@ -37,6 +38,9 @@ export const useRenderStore = defineStore(`render`, () => {
       customizeTheme(theme, { fontSize, color: options.primaryColor }),
     )
 
+    const headingTemplateStore = useHeadingTemplateStore()
+    const headingTemplate = headingTemplateStore.currentTemplate
+
     renderer = initRenderer({
       theme: themeConfig,
       fonts,
@@ -45,6 +49,7 @@ export const useRenderStore = defineStore(`render`, () => {
       isUseJustify: options.isUseJustify,
       isMacCodeBlock: options.isMacCodeBlock,
       isShowLineNumber: options.isShowLineNumber,
+      headingTemplate: headingTemplate || null,
     })
 
     return renderer
@@ -89,6 +94,9 @@ export const useRenderStore = defineStore(`render`, () => {
       throw new Error(`Renderer not initialized. Call initRendererInstance first.`)
     }
 
+    const headingTemplateStore = useHeadingTemplateStore()
+    const headingTemplate = headingTemplateStore.currentTemplate
+
     // 重置渲染器配置
     renderer.reset({
       citeStatus: options.isCiteStatus,
@@ -98,6 +106,7 @@ export const useRenderStore = defineStore(`render`, () => {
       countStatus: options.isCountStatus,
       isMacCodeBlock: options.isMacCodeBlock,
       isShowLineNumber: options.isShowLineNumber,
+      headingTemplate: headingTemplate || null,
     })
 
     // 渲染 Markdown

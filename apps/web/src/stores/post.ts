@@ -26,8 +26,34 @@ export interface Post {
  * 负责管理文章列表、当前文章、文章 CRUD 操作
  */
 export const usePostStore = defineStore(`post`, () => {
-  // 内容列表
-  const posts = useStorage<Post[]>(addPrefix(`posts`), [
+  // 安全的 localStorage 读取函数
+  function safeGetStorage<T>(key: string, defaultValue: T): T {
+    try {
+      const stored = localStorage.getItem(key)
+      if (stored) {
+        return JSON.parse(stored) as T
+      }
+    }
+    catch (error) {
+      console.warn(`Failed to read ${key} from storage:`, error)
+    }
+    return defaultValue
+  }
+
+  // 安全的 localStorage 写入函数
+  function safeSetStorage<T>(key: string, value: T): boolean {
+    try {
+      localStorage.setItem(key, JSON.stringify(value))
+      return true
+    }
+    catch (error) {
+      console.warn(`Failed to save ${key} to storage (quota exceeded):`, error)
+      return false
+    }
+  }
+
+  // 内容列表 - 使用手动管理的 ref
+  const defaultPosts: Post[] = [
     {
       id: uuid(),
       title: `内容1`,
@@ -38,13 +64,49 @@ export const usePostStore = defineStore(`post`, () => {
       createDatetime: new Date(),
       updateDatetime: new Date(),
     },
-  ])
+  ]
+
+  const posts = ref<Post[]>(safeGetStorage(addPrefix(`posts`), defaultPosts))
+
+  // 监听 posts 变化并保存（带错误处理和节流，限制历史记录大小）
+  let saveTimer: ReturnType<typeof setTimeout> | null = null
+  watch(posts, (newPosts) => {
+    // 限制历史记录大小，每个文章最多保留 10 条
+    const cleanedPosts = newPosts.map(post => ({
+      ...post,
+      history: post.history?.slice(-10) || [],
+    }))
+
+    // 节流保存，避免频繁写入
+    if (saveTimer) {
+      clearTimeout(saveTimer)
+    }
+    saveTimer = setTimeout(() => {
+      safeSetStorage(addPrefix(`posts`), cleanedPosts)
+    }, 500)
+  }, { deep: true })
 
   // 当前文章 ID
-  const currentPostId = useStorage(addPrefix(`current_post_id`), ``)
+  const currentPostId = ref<string>(safeGetStorage(addPrefix(`current_post_id`), ``))
+  watch(currentPostId, (newValue) => {
+    try {
+      localStorage.setItem(addPrefix(`current_post_id`), newValue)
+    }
+    catch (error) {
+      console.warn(`Failed to save currentPostId to storage:`, error)
+    }
+  })
 
   // 预备弃用的旧字段（用于迁移）
-  const editorContent = useStorage(`__editor_content`, DEFAULT_CONTENT)
+  const editorContent = ref<string>(safeGetStorage(`__editor_content`, DEFAULT_CONTENT))
+  watch(editorContent, (newValue) => {
+    try {
+      localStorage.setItem(`__editor_content`, newValue)
+    }
+    catch (error) {
+      console.warn(`Failed to save editorContent to storage:`, error)
+    }
+  })
 
   // 在补齐 id 后，若 currentPostId 无效 ➜ 自动指向第一篇
   onBeforeMount(() => {
@@ -134,6 +196,10 @@ export const usePostStore = defineStore(`post`, () => {
     if (post) {
       post.content = content
       post.updateDatetime = new Date()
+      // 确保历史记录不超过限制
+      if (post.history && post.history.length > 10) {
+        post.history = post.history.slice(-10)
+      }
     }
   }
 

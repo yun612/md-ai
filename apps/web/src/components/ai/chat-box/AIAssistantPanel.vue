@@ -375,7 +375,7 @@ async function sendMessage() {
     else {
       console.error(`请求失败:`, e)
       messages.value[messages.value.length - 1].content
-        = `❌ 请求失败: ${(e as Error).message}`
+        = `请求失败: ${(e as Error).message}`
     }
     await scrollToBottom(true)
   }

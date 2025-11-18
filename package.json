@@ -30,7 +30,9 @@
   },
   "dependencies": {
     "@codemirror/state": "^6.5.2",
-    "@codemirror/view": "^6.38.6"
+    "@codemirror/view": "^6.38.6",
+    "@mendable/firecrawl-js": "^1.21.1",
+    "pnpm": "^10.20.0"
   },
   "devDependencies": {
     "@antfu/eslint-config": "6.1.0",
@@ -58,6 +60,7 @@
     "pre-commit": "npx lint-staged"
   },
   "lint-staged": {
-    "*": "eslint --fix"
+    "*.{js,ts,vue,tsx,jsx}": "eslint --fix",
+    "*.{md,json,yaml,yml}": "prettier --write"
   }
 }

@@ -13,6 +13,7 @@ import PickColors from 'vue-pick-colors'
 import { useCssEditorStore } from '@/stores/cssEditor'
 import { useDisplayStore } from '@/stores/display'
 import { useEditorStore } from '@/stores/editor'
+import { useHeadingTemplateStore } from '@/stores/headingTemplate'
 import { useRenderStore } from '@/stores/render'
 import { useThemeStore } from '@/stores/theme'
 import { useUIStore } from '@/stores/ui'
@@ -31,6 +32,7 @@ const uiStore = useUIStore()
 const editorStore = useEditorStore()
 const renderStore = useRenderStore()
 const cssEditorStore = useCssEditorStore()
+const headingTemplateStore = useHeadingTemplateStore()
 
 const { toggleShowCssEditor } = displayStore
 
@@ -45,6 +47,9 @@ const {
 } = storeToRefs(themeStore)
 
 const { isDark } = storeToRefs(uiStore)
+
+const { selectedTemplateId } = storeToRefs(headingTemplateStore)
+const availableTemplates = computed(() => headingTemplateStore.getAvailableTemplates().map(t => ({ label: t.name, value: t.id, desc: t.description })))
 
 // Editor refresh function - triggers re-render with current theme settings
 function editorRefresh() {
@@ -121,6 +126,11 @@ function legendChanged(newVal: string) {
   editorRefresh()
 }
 
+async function headingTemplateChanged(templateId: string) {
+  await headingTemplateStore.selectTemplate(templateId)
+  editorRefresh()
+}
+
 function macCodeBlockChanged() {
   themeStore.isMacCodeBlock = !themeStore.isMacCodeBlock
   editorRefresh()
@@ -189,6 +199,12 @@ const formatOptions = ref<Format[]>([`rgb`, `hex`, `hsl`, `hsv`])
         :options="legendOptions"
         :current="legend"
         :change="legendChanged"
+      />
+      <StyleOptionMenu
+        title="标题模板"
+        :options="availableTemplates"
+        :current="selectedTemplateId"
+        :change="headingTemplateChanged"
       />
       <MenubarSeparator />
       <MenubarCheckboxItem @click.self.prevent="showPicker">
@@ -264,6 +280,12 @@ const formatOptions = ref<Format[]>([`rgb`, `hex`, `hsl`, `hsv`])
         :options="legendOptions"
         :current="legend"
         :change="legendChanged"
+      />
+      <StyleOptionMenu
+        title="标题模板"
+        :options="availableTemplates"
+        :current="selectedTemplateId"
+        :change="headingTemplateChanged"
       />
       <MenubarSeparator />
       <MenubarCheckboxItem @click.self.prevent="showPicker">

@@ -2,6 +2,8 @@ import type { PropertiesHyphen } from 'csstype'
 
 import type { Token } from 'marked'
 
+import type { HeadingStylesConfig } from '../utils/headingTemplate'
+
 type GFMBlock = `blockquote_note` | `blockquote_tip` | `blockquote_info` | `blockquote_important` | `blockquote_warning` | `blockquote_caution`
   | `blockquote_title` | `blockquote_title_note` | `blockquote_title_tip` | `blockquote_title_info` | `blockquote_title_important` | `blockquote_title_warning` | `blockquote_title_caution`
   | `blockquote_p` | `blockquote_p_note` | `blockquote_p_tip` | `blockquote_p_info` | `blockquote_p_important` | `blockquote_p_warning` | `blockquote_p_caution`
@@ -33,6 +35,7 @@ export interface IOpts {
   countStatus?: boolean
   isMacCodeBlock?: boolean
   isShowLineNumber?: boolean
+  headingTemplate?: HeadingStylesConfig | null
 }
 
 export type ThemeStyles = Record<Block | Inline, ExtendedProperties>

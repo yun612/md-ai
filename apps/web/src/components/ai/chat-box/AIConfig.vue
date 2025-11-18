@@ -37,14 +37,14 @@ watch(model, () => {
 
 function saveConfig(emitEvent = true) {
   if (emitEvent) {
-    testResult.value = `✅ 配置已保存`
+    testResult.value = `配置已保存`
     emit(`saved`)
   }
 }
 
 function clearConfig() {
   AIConfigStore.reset()
-  testResult.value = `🗑️ 当前 AI 配置已清除`
+  testResult.value = `当前 AI 配置已清除`
 }
 
 async function testConnection() {
@@ -75,7 +75,7 @@ async function testConnection() {
     })
 
     if (res.ok) {
-      testResult.value = `✅ 测试成功，/chat/completions 可用`
+      testResult.value = `测试成功，/chat/completions 可用`
       saveConfig(false)
     }
     else {
@@ -87,17 +87,17 @@ async function testConnection() {
           && (error?.code === `ModelNotOpen`
             || /not activated|未开通/i.test(error?.message))
         ) {
-          testResult.value = `⚠️ 测试成功，但当前模型未开通：${model.value}`
+          testResult.value = `测试成功，但当前模型未开通：${model.value}`
           saveConfig(false)
           return
         }
       }
       catch {}
-      testResult.value = `❌ 测试失败：${res.status} ${res.statusText}，${text}`
+      testResult.value = `测试失败：${res.status} ${res.statusText}，${text}`
     }
   }
   catch (err) {
-    testResult.value = `❌ 测试失败：${(err as Error).message}`
+    testResult.value = `测试失败：${(err as Error).message}`
   }
   finally {
     loading.value = false

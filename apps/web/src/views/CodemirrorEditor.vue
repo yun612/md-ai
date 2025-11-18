@@ -5,10 +5,11 @@ import { Compartment, EditorState } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
 import { highlightPendingBlocks, hljs } from '@md/core'
 import { themeMap } from '@md/shared/configs'
-import { markdownSetup, theme } from '@md/shared/editor'
+import { markdownSetup, theme, truncateBase64Images } from '@md/shared/editor'
 import imageCompression from 'browser-image-compression'
 import { Eye, Pen } from 'lucide-vue-next'
 import { SidebarAIToolbar } from '@/components/ai'
+import AIAssistantSidebar from '@/components/ai/AIAssistantSidebar.vue'
 import {
   ResizableHandle,
   ResizablePanel,
@@ -43,6 +44,7 @@ const {
   isEditOnLeft,
   isOpenPostSlider,
   isOpenRightSlider,
+  isOpenAIPanel,
   isOpenConfirmDialog,
 } = storeToRefs(uiStore)
 
@@ -463,6 +465,7 @@ function createFormTextArea(dom: HTMLDivElement) {
       markdownSetup({
         onSearch: openSearchWithSelection,
       }),
+      truncateBase64Images(), // 截断 base64 图片数据显示
       themeCompartment.of(theme(isDark.value)),
       EditorView.updateListener.of((update) => {
         if (update.docChanged) {
@@ -717,6 +720,19 @@ onUnmounted(() => {
             </div>
             <CssEditor />
             <RightSlider />
+          </ResizablePanel>
+          <ResizableHandle
+            v-if="isOpenAIPanel"
+            class="hidden md:block"
+          />
+          <ResizablePanel
+            v-if="isOpenAIPanel"
+            :default-size="25"
+            :min-size="20"
+            :max-size="40"
+            class="border-l"
+          >
+            <AIAssistantSidebar />
           </ResizablePanel>
         </ResizablePanelGroup>
       </div>
