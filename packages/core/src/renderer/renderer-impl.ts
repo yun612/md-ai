@@ -377,7 +377,12 @@ export function initRenderer(initialOpts: IOpts): RendererAPI {
 
       // 如果提供了自定义模板，使用模板生成 H2-H6 标题
       if (opts.headingTemplate && depth >= 2 && depth <= 6) {
-        return generateHeadingHTML(depth as 2 | 3 | 4 | 5 | 6, text, opts.headingTemplate)
+        return generateHeadingHTML(
+          depth as 2 | 3 | 4 | 5 | 6,
+          text,
+          opts.headingTemplate,
+          opts.primaryColor,
+        )
       }
 
       // 使用内置模板生成 H1-H6 标题

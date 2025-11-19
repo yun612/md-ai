@@ -131,8 +131,12 @@ function leftAndRightScroll() {
 
     clearTimeout(timeout.value)
     if (text === `preview`) {
-      source = previewRef.value!
+      source = previewRef.value
       target = findCodeMirrorScroller()
+      if (!source) {
+        console.warn(`Cannot find preview container`)
+        return
+      }
       if (!target) {
         console.warn(`Cannot find CodeMirror scroll container`)
         return
@@ -142,20 +146,28 @@ function leftAndRightScroll() {
       if (scrollEl) {
         scrollEl.removeEventListener(`scroll`, editorScrollCB)
         timeout.value = setTimeout(() => {
-          scrollEl.addEventListener(`scroll`, editorScrollCB)
+          if (scrollEl) {
+            scrollEl.addEventListener(`scroll`, editorScrollCB)
+          }
         }, 300)
       }
     }
     else {
       source = findCodeMirrorScroller()
-      target = previewRef.value!
+      target = previewRef.value
       if (!source) {
         console.warn(`Cannot find CodeMirror scroll container`)
         return
       }
+      if (!target) {
+        console.warn(`Cannot find preview container`)
+        return
+      }
       target.removeEventListener(`scroll`, previewScrollCB, false)
       timeout.value = setTimeout(() => {
-        target!.addEventListener(`scroll`, previewScrollCB, false)
+        if (target) {
+          target.addEventListener(`scroll`, previewScrollCB, false)
+        }
       }, 300)
     }
 

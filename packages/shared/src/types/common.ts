@@ -36,6 +36,7 @@ export interface IOpts {
   isMacCodeBlock?: boolean
   isShowLineNumber?: boolean
   headingTemplate?: HeadingStylesConfig | null
+  primaryColor?: string
 }
 
 export type ThemeStyles = Record<Block | Inline, ExtendedProperties>

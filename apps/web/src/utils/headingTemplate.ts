@@ -1,3 +1,5 @@
+import { generateColorTheme } from '@md/shared/utils/colorHelpers'
+
 export interface HeadingTemplate {
   name: string
   description: string
@@ -109,6 +111,7 @@ export function replaceTemplateVariables(
   template: string,
   text: string,
   config: HeadingStylesConfig,
+  primaryColor?: string,
 ): string {
   let result = template
 
@@ -127,9 +130,12 @@ export function replaceTemplateVariables(
     .replace(/\{\{text\}\}/g, text)
 
   // 替换颜色主题变量
-  Object.keys(config.colorTheme).forEach((key) => {
+  const generatedTheme = primaryColor ? generateColorTheme(primaryColor) : null
+  const colorTheme = generatedTheme || config.colorTheme
+
+  Object.keys(colorTheme).forEach((key) => {
     const regex = new RegExp(`\\{\\{${key}\\}\\}`, `g`)
-    result = result.replace(regex, config.colorTheme[key])
+    result = result.replace(regex, colorTheme[key])
   })
 
   return result
@@ -139,6 +145,7 @@ export function generateHeadingHTML(
   level: 2 | 3 | 4 | 5 | 6,
   text: string,
   config?: HeadingStylesConfig,
+  primaryColor?: string,
 ): string {
   const templateConfig = config || loadHeadingTemplateSync()
   const headingKey = `h${level}` as keyof typeof templateConfig.headings
@@ -148,7 +155,7 @@ export function generateHeadingHTML(
   }
 
   const template = templateConfig.headings[headingKey].template
-  return replaceTemplateVariables(template, text, templateConfig)
+  return replaceTemplateVariables(template, text, templateConfig, primaryColor)
 }
 
 export function getAllTemplates(): HeadingTemplate[] {

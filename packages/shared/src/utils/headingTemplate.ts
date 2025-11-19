@@ -1,3 +1,5 @@
+import { generateColorTheme } from './colorHelpers'
+
 export interface HeadingTemplate {
   name: string
   description: string
@@ -27,6 +29,7 @@ export function replaceTemplateVariables(
   template: string,
   text: string,
   config: HeadingStylesConfig,
+  primaryColor?: string,
 ): string {
   let result = template
 
@@ -42,9 +45,12 @@ export function replaceTemplateVariables(
     .replace(/\{\{bgImageUrl\}\}/g, config.bgImageUrl)
     .replace(/\{\{text\}\}/g, text)
 
-  Object.keys(config.colorTheme).forEach((key) => {
+  const generatedTheme = primaryColor ? generateColorTheme(primaryColor) : null
+  const colorTheme = generatedTheme || config.colorTheme
+
+  Object.keys(colorTheme).forEach((key) => {
     const regex = new RegExp(`\\{\\{${key}\\}\\}`, `g`)
-    result = result.replace(regex, config.colorTheme[key])
+    result = result.replace(regex, colorTheme[key])
   })
 
   return result
@@ -54,6 +60,7 @@ export function generateHeadingHTML(
   level: 2 | 3 | 4 | 5 | 6,
   text: string,
   config: HeadingStylesConfig,
+  primaryColor?: string,
 ): string {
   const headingKey = `h${level}` as keyof typeof config.headings
 
@@ -62,7 +69,7 @@ export function generateHeadingHTML(
   }
 
   const template = config.headings[headingKey].template
-  return replaceTemplateVariables(template, text, config)
+  return replaceTemplateVariables(template, text, config, primaryColor)
 }
 
 export function getDefaultTemplate(): HeadingStylesConfig {

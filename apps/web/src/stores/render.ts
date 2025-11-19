@@ -50,6 +50,7 @@ export const useRenderStore = defineStore(`render`, () => {
       isMacCodeBlock: options.isMacCodeBlock,
       isShowLineNumber: options.isShowLineNumber,
       headingTemplate: headingTemplate || null,
+      primaryColor: options.primaryColor,
     })
 
     return renderer
@@ -96,6 +97,7 @@ export const useRenderStore = defineStore(`render`, () => {
 
     const headingTemplateStore = useHeadingTemplateStore()
     const headingTemplate = headingTemplateStore.currentTemplate
+    const themeStore = useThemeStore()
 
     // 重置渲染器配置
     renderer.reset({
@@ -107,6 +109,7 @@ export const useRenderStore = defineStore(`render`, () => {
       isMacCodeBlock: options.isMacCodeBlock,
       isShowLineNumber: options.isShowLineNumber,
       headingTemplate: headingTemplate || null,
+      primaryColor: themeStore.primaryColor,
     })
 
     // 渲染 Markdown
@@ -136,6 +139,7 @@ export const useRenderStore = defineStore(`render`, () => {
       theme: newTheme,
       fonts,
       size,
+      primaryColor: color,
     })
   }
 
@@ -154,6 +158,7 @@ export const useRenderStore = defineStore(`render`, () => {
     )
     renderer.setOptions({
       theme: newTheme,
+      primaryColor: themeStore.primaryColor,
     })
   }
 
