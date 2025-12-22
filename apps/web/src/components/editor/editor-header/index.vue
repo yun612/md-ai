@@ -1,12 +1,15 @@
 <script setup lang="ts">
+import type { ModelConfig } from '@/tasks'
 import { Bot, ChevronDownIcon, Menu, Palette, SlidersHorizontal } from 'lucide-vue-next'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { useAIConfigStore } from '@/stores/aiConfig'
 import { useDisplayStore } from '@/stores/display'
 import { useEditorStore } from '@/stores/editor'
 import { useExportStore } from '@/stores/export'
 import { useRenderStore } from '@/stores/render'
 import { useThemeStore } from '@/stores/theme'
 import { useUIStore } from '@/stores/ui'
+import { startTaskWithStreaming } from '@/tasks'
 import { addPrefix, generatePureHTML, processClipboardContent } from '@/utils'
 import FormatDropdown from './FormatDropdown.vue'
 
@@ -18,12 +21,44 @@ const renderStore = useRenderStore()
 const uiStore = useUIStore()
 const exportStore = useExportStore()
 const displayStore = useDisplayStore()
+const aiConfigStore = useAIConfigStore()
 
 const { editor } = storeToRefs(editorStore)
 const { output } = storeToRefs(renderStore)
 const { primaryColor } = storeToRefs(themeStore)
 const { isOpenRightSlider, isOpenAIPanel } = storeToRefs(uiStore)
 const { toggleAIPanel } = uiStore
+const {
+  type: aiServiceType,
+  endpoint,
+  model,
+  apiKey,
+  maxToken,
+} = storeToRefs(aiConfigStore)
+
+const providerMap: Record<string, NonNullable<ModelConfig[`agentModel`]>[`provider`]> = {
+  doubao: `doubao`,
+  google: `google`,
+  minimax: `minimax`,
+  openrouter: `openrouter`,
+}
+
+const modelConfig = computed<ModelConfig>(() => ({
+  agentModel: {
+    provider: providerMap[aiServiceType.value] || `openrouter`,
+    apiKey: apiKey.value,
+    baseUrl: endpoint.value,
+    modelName: model.value,
+    maxTokens: maxToken.value,
+  },
+}))
+
+const taskDialogOpen = ref(false)
+const taskInstruction = ref(`请根据当前文章内容生成一段摘要。`)
+const taskOutput = ref(``)
+const taskReasoning = ref<string[]>([])
+const taskRunning = ref(false)
+const lastTaskError = ref<string | null>(null)
 
 // Editor refresh function
 function editorRefresh() {
@@ -126,6 +161,41 @@ function fallbackCopyUsingExecCommand(htmlContent: string) {
   }
 
   return successful
+}
+
+async function handleStartStreamingTask() {
+  if (!taskInstruction.value.trim()) {
+    toast.error(`请输入任务指令`)
+    return
+  }
+
+  taskRunning.value = true
+  taskOutput.value = ``
+  taskReasoning.value = []
+  lastTaskError.value = null
+
+  try {
+    await startTaskWithStreaming(
+      taskInstruction.value,
+      modelConfig.value,
+      (chunk) => {
+        if (chunk?.type === `text` && chunk.text) {
+          taskOutput.value += chunk.text
+        }
+        else if (chunk?.type === `reasoning` && chunk.reasoning) {
+          taskReasoning.value.push(chunk.reasoning)
+        }
+      },
+    )
+  }
+  catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    lastTaskError.value = message
+    toast.error(`AI 任务失败：${message}`)
+  }
+  finally {
+    taskRunning.value = false
+  }
 }
 
 // 复制到微信公众号
@@ -293,6 +363,15 @@ async function copy() {
       <!-- 文章信息（移动端隐藏） -->
       <PostInfo class="hidden md:inline-flex" />
 
+      <Button
+        variant="outline"
+        size="sm"
+        class="hidden md:inline-flex"
+        @click="taskDialogOpen = true"
+      >
+        流式 AI 任务
+      </Button>
+
       <!-- 编辑器设置按钮 -->
       <Popover>
         <PopoverTrigger as-child>
@@ -331,6 +410,59 @@ async function copy() {
   <FundDialog :visible="fundDialogVisible" @close="fundDialogVisible = false" />
   <EditorStateDialog :visible="editorStateDialogVisible" @close="editorStateDialogVisible = false" />
   <AIImageGeneratorPanel v-model:open="displayStore.aiImageDialogVisible" />
+  <Dialog v-model:open="taskDialogOpen">
+    <DialogContent class="sm:max-w-xl">
+      <DialogHeader>
+        <DialogTitle>AI 任务流式调用</DialogTitle>
+        <DialogDescription>使用 startTaskWithStreaming 并实时展示输出</DialogDescription>
+      </DialogHeader>
+
+      <div class="space-y-4">
+        <div class="space-y-2">
+          <Label for="ai-task-instruction">任务指令</Label>
+          <Textarea
+            id="ai-task-instruction"
+            v-model="taskInstruction"
+            rows="3"
+            placeholder="例如：请帮我为当前文章生成 50 字摘要"
+          />
+        </div>
+
+        <div class="flex items-center gap-2">
+          <Button :disabled="taskRunning" @click="handleStartStreamingTask">
+            {{ taskRunning ? '调用中...' : '开始调用' }}
+          </Button>
+          <p class="text-xs text-muted-foreground">
+            当前模型：{{ model || '未配置' }}
+          </p>
+        </div>
+
+        <div class="space-y-2">
+          <div class="flex items-center justify-between text-sm font-medium">
+            <span>调用结果</span>
+            <span v-if="taskRunning" class="text-xs text-primary">流式输出中...</span>
+          </div>
+          <div class="min-h-[140px] whitespace-pre-wrap rounded-md border bg-muted/40 p-3 text-sm">
+            {{ taskOutput || '暂无输出' }}
+          </div>
+
+          <div v-if="taskReasoning.length" class="rounded-md border bg-muted/30 p-3 text-xs text-muted-foreground">
+            <div class="mb-1 font-semibold">
+              模型思考
+            </div>
+            <div v-for="(item, idx) in taskReasoning" :key="idx" class="mb-1 last:mb-0">
+              {{ item }}
+            </div>
+          </div>
+
+          <Alert v-if="lastTaskError" variant="destructive">
+            <AlertTitle>调用失败</AlertTitle>
+            <AlertDescription>{{ lastTaskError }}</AlertDescription>
+          </Alert>
+        </div>
+      </div>
+    </DialogContent>
+  </Dialog>
 </template>
 
 <style lang="less" scoped>
