@@ -164,14 +164,17 @@ function getDefaultMessages(): ChatMessage[] {
   return [{ role: `assistant`, content: `你好，我是 AI 助手，有什么可以帮你的？` }]
 }
 
-// 清理消息数据，移除 base64 数据以节省存储空间
+// 清理消息数据，移除 base64 数据以节省存储空间,新的数据做了拷贝，复制，其余去除
 function cleanMessagesForStorage(messages: ChatMessage[]): ChatMessage[] {
+  //  map 展开数据，浅拷贝一份数据
   return messages.map((msg) => {
+    // 复制数据，保留原来的数据
     const cleaned = { ...msg }
 
     // 清理图片结果中的 base64 数据，只保留 URL 和元数据
     if (cleaned.imageResults && Array.isArray(cleaned.imageResults)) {
       cleaned.imageResults = cleaned.imageResults.map((img: any) => {
+        // 只保留必要的字段，prompt描述，操作类型 op
         const cleanedImg: any = {
           prompt: img.prompt,
           op: img.op,
@@ -226,6 +229,7 @@ function applyImageToEditor(img: { url?: string, base64?: string, prompt?: strin
     }
     else if (img.base64) {
       // 如果是 base64，使用 data URI
+      // ![](data:image/png;base64,${img.base64})
       imageMarkdown = `![${altText}](data:image/png;base64,${img.base64})`
     }
     else {
@@ -314,6 +318,7 @@ function editMessage(content: string) {
   })
 }
 
+// 渲染markdown
 function renderMarkdown(content: string): string {
   if (!content)
     return ``

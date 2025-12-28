@@ -163,6 +163,8 @@ function leftAndRightScroll() {
         console.warn(`Cannot find preview container`)
         return
       }
+
+      // 防止都滚动的冲突，先去除监听滚的事件，本次滚动结束后再恢复监听。
       target.removeEventListener(`scroll`, previewScrollCB, false)
       timeout.value = setTimeout(() => {
         if (target) {

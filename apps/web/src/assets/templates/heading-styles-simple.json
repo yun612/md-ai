@@ -1,0 +1,70 @@
+{
+  "name": "简洁通用标题模板",
+  "description": "统一的标题样式，所有级别标题使用相同设计，左侧图标圆圈+右侧文字+底部横线",
+  "version": "1.0.0",
+  "author": "md-ai",
+  "iconUrl": "https://mmbiz.uecloud.com.cn/sz_mmbiz_png/I1fyHmvzZiaXqWLwTRoib4mcGgQXe0uyNTqEWV7FyAZ2icPV08wW1v4MibjFeMbf9frCCVnibxzz0LzmkZA2PAyxOcQ/0?from=appmsg",
+  "bgImageUrl": "https://mmbiz.uecloud.com.cn/sz_mmbiz_png/I1fyHmvzZiaXqWLwTRoib4mcGgQXe0uyNTqEWV7FyAZ2icPV08wW1v4MibjFeMbf9frCCVnibxzz0LzmkZA2PAyxOcQ/0?from=appmsg",
+  "colorTheme": {
+    "lightGreen": "#d4edda",
+    "green1": "#66bb6a",
+    "green2": "#4caf50",
+    "green3": "#43a047",
+    "darkGreen": "#2e7d32",
+    "yellow": "#ffc107",
+    "silver": "#c0c0c0",
+    "text": "rgba(0,0,0,.9)",
+    "textLight": "rgba(0,0,0,.7)"
+  },
+  "headings": {
+    "h1": {
+      "name": "通用标题样式",
+      "description": "左侧浅绿色圆形+灯泡图标，右侧深绿色文字，底部横线+十字",
+      "template": "<section style=\"display: flex; align-items: center; margin: 25px 0; gap: 12px;\" data-heading=\"true\" data-heading-depth=\"1\">\n  <section style=\"position: relative; width: 40px; height: 40px; background: {{lightGreen}}; border-radius: 50%; display: flex; justify-content: center; align-items: center; flex-shrink: 0; opacity: 0.8;\">\n    <section style=\"width: 22px; height: 22px; background: {{yellow}}; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); position: relative;\">\n      <section style=\"position: absolute; top: 6px; left: 6px; width: 10px; height: 10px; background: {{yellow}}; border-radius: 50%; box-shadow: 0 0 6px {{yellow}};\"></section>\n      <section style=\"position: absolute; bottom: 2px; left: 50%; transform: translateX(-50%); width: 6px; height: 4px; background: {{silver}}; border-radius: 2px;\"></section>\n    </section>\n  </section>\n  <section style=\"flex: 1; position: relative; padding-bottom: 10px;\">\n    <section style=\"color: {{darkGreen}}; font-size: 22px; font-weight: 700; letter-spacing: 0.5px; font-family: 'Arial', 'Microsoft YaHei', sans-serif; line-height: 1.5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;\">\n      {{text}}\n    </section>\n    <section style=\"position: absolute; bottom: 0; left: 0; right: 0; height: 2px; background: {{darkGreen}};\">\n      <section style=\"position: absolute; right: 0; top: -4px; width: 2px; height: 10px; background: {{darkGreen}};\"></section>\n    </section>\n  </section>\n</section>"
+    },
+    "h2": {
+      "name": "通用标题样式",
+      "description": "左侧浅绿色圆形+灯泡图标，右侧深绿色文字，底部横线+十字",
+      "template": "<section style=\"display: flex; align-items: center; margin: 25px 0; gap: 12px;\" data-heading=\"true\" data-heading-depth=\"2\">\n  <section style=\"position: relative; width: 40px; height: 40px; background: {{lightGreen}}; border-radius: 50%; display: flex; justify-content: center; align-items: center; flex-shrink: 0; opacity: 0.8;\">\n    <section style=\"width: 22px; height: 22px; background: {{yellow}}; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); position: relative;\">\n      <section style=\"position: absolute; top: 6px; left: 6px; width: 10px; height: 10px; background: {{yellow}}; border-radius: 50%; box-shadow: 0 0 6px {{yellow}};\"></section>\n      <section style=\"position: absolute; bottom: 2px; left: 50%; transform: translateX(-50%); width: 6px; height: 4px; background: {{silver}}; border-radius: 2px;\"></section>\n    </section>\n  </section>\n  <section style=\"flex: 1; position: relative; padding-bottom: 10px;\">\n    <section style=\"color: {{darkGreen}}; font-size: 22px; font-weight: 700; letter-spacing: 0.5px; font-family: 'Arial', 'Microsoft YaHei', sans-serif; line-height: 1.5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;\">\n      {{text}}\n    </section>\n    <section style=\"position: absolute; bottom: 0; left: 0; right: 0; height: 2px; background: {{darkGreen}};\">\n      <section style=\"position: absolute; right: 0; top: -4px; width: 2px; height: 10px; background: {{darkGreen}};\"></section>\n    </section>\n  </section>\n</section>"
+    },
+    "h3": {
+      "name": "通用标题样式",
+      "description": "左侧浅绿色圆形+灯泡图标，右侧深绿色文字，底部横线+十字",
+      "template": "<section style=\"display: flex; align-items: center; margin: 25px 0; gap: 12px;\" data-heading=\"true\" data-heading-depth=\"3\">\n  <section style=\"position: relative; width: 40px; height: 40px; background: {{lightGreen}}; border-radius: 50%; display: flex; justify-content: center; align-items: center; flex-shrink: 0; opacity: 0.8;\">\n    <section style=\"width: 22px; height: 22px; background: {{yellow}}; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); position: relative;\">\n      <section style=\"position: absolute; top: 6px; left: 6px; width: 10px; height: 10px; background: {{yellow}}; border-radius: 50%; box-shadow: 0 0 6px {{yellow}};\"></section>\n      <section style=\"position: absolute; bottom: 2px; left: 50%; transform: translateX(-50%); width: 6px; height: 4px; background: {{silver}}; border-radius: 2px;\"></section>\n    </section>\n  </section>\n  <section style=\"flex: 1; position: relative; padding-bottom: 10px;\">\n    <section style=\"color: {{darkGreen}}; font-size: 22px; font-weight: 700; letter-spacing: 0.5px; font-family: 'Arial', 'Microsoft YaHei', sans-serif; line-height: 1.5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;\">\n      {{text}}\n    </section>\n    <section style=\"position: absolute; bottom: 0; left: 0; right: 0; height: 2px; background: {{darkGreen}};\">\n      <section style=\"position: absolute; right: 0; top: -4px; width: 2px; height: 10px; background: {{darkGreen}};\"></section>\n    </section>\n  </section>\n</section>"
+    },
+    "h4": {
+      "name": "通用标题样式",
+      "description": "左侧浅绿色圆形+灯泡图标，右侧深绿色文字，底部横线+十字",
+      "template": "<section style=\"display: flex; align-items: center; margin: 25px 0; gap: 12px;\" data-heading=\"true\" data-heading-depth=\"4\">\n  <section style=\"position: relative; width: 40px; height: 40px; background: {{lightGreen}}; border-radius: 50%; display: flex; justify-content: center; align-items: center; flex-shrink: 0; opacity: 0.8;\">\n    <section style=\"width: 22px; height: 22px; background: {{yellow}}; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); position: relative;\">\n      <section style=\"position: absolute; top: 6px; left: 6px; width: 10px; height: 10px; background: {{yellow}}; border-radius: 50%; box-shadow: 0 0 6px {{yellow}};\"></section>\n      <section style=\"position: absolute; bottom: 2px; left: 50%; transform: translateX(-50%); width: 6px; height: 4px; background: {{silver}}; border-radius: 2px;\"></section>\n    </section>\n  </section>\n  <section style=\"flex: 1; position: relative; padding-bottom: 10px;\">\n    <section style=\"color: {{darkGreen}}; font-size: 22px; font-weight: 700; letter-spacing: 0.5px; font-family: 'Arial', 'Microsoft YaHei', sans-serif; line-height: 1.5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;\">\n      {{text}}\n    </section>\n    <section style=\"position: absolute; bottom: 0; left: 0; right: 0; height: 2px; background: {{darkGreen}};\">\n      <section style=\"position: absolute; right: 0; top: -4px; width: 2px; height: 10px; background: {{darkGreen}};\"></section>\n    </section>\n  </section>\n</section>"
+    },
+    "h5": {
+      "name": "通用标题样式",
+      "description": "左侧浅绿色圆形+灯泡图标，右侧深绿色文字，底部横线+十字",
+      "template": "<section style=\"display: flex; align-items: center; margin: 25px 0; gap: 12px;\" data-heading=\"true\" data-heading-depth=\"5\">\n  <section style=\"position: relative; width: 40px; height: 40px; background: {{lightGreen}}; border-radius: 50%; display: flex; justify-content: center; align-items: center; flex-shrink: 0; opacity: 0.8;\">\n    <section style=\"width: 22px; height: 22px; background: {{yellow}}; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); position: relative;\">\n      <section style=\"position: absolute; top: 6px; left: 6px; width: 10px; height: 10px; background: {{yellow}}; border-radius: 50%; box-shadow: 0 0 6px {{yellow}};\"></section>\n      <section style=\"position: absolute; bottom: 2px; left: 50%; transform: translateX(-50%); width: 6px; height: 4px; background: {{silver}}; border-radius: 2px;\"></section>\n    </section>\n  </section>\n  <section style=\"flex: 1; position: relative; padding-bottom: 10px;\">\n    <section style=\"color: {{darkGreen}}; font-size: 22px; font-weight: 700; letter-spacing: 0.5px; font-family: 'Arial', 'Microsoft YaHei', sans-serif; line-height: 1.5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;\">\n      {{text}}\n    </section>\n    <section style=\"position: absolute; bottom: 0; left: 0; right: 0; height: 2px; background: {{darkGreen}};\">\n      <section style=\"position: absolute; right: 0; top: -4px; width: 2px; height: 10px; background: {{darkGreen}};\"></section>\n    </section>\n  </section>\n</section>"
+    },
+    "h6": {
+      "name": "通用标题样式",
+      "description": "左侧浅绿色圆形+灯泡图标，右侧深绿色文字，底部横线+十字",
+      "template": "<section style=\"display: flex; align-items: center; margin: 25px 0; gap: 12px;\" data-heading=\"true\" data-heading-depth=\"6\">\n  <section style=\"position: relative; width: 40px; height: 40px; background: {{lightGreen}}; border-radius: 50%; display: flex; justify-content: center; align-items: center; flex-shrink: 0; opacity: 0.8;\">\n    <section style=\"width: 22px; height: 22px; background: {{yellow}}; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); position: relative;\">\n      <section style=\"position: absolute; top: 6px; left: 6px; width: 10px; height: 10px; background: {{yellow}}; border-radius: 50%; box-shadow: 0 0 6px {{yellow}};\"></section>\n      <section style=\"position: absolute; bottom: 2px; left: 50%; transform: translateX(-50%); width: 6px; height: 4px; background: {{silver}}; border-radius: 2px;\"></section>\n    </section>\n  </section>\n  <section style=\"flex: 1; position: relative; padding-bottom: 10px;\">\n    <section style=\"color: {{darkGreen}}; font-size: 22px; font-weight: 700; letter-spacing: 0.5px; font-family: 'Arial', 'Microsoft YaHei', sans-serif; line-height: 1.5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;\">\n      {{text}}\n    </section>\n    <section style=\"position: absolute; bottom: 0; left: 0; right: 0; height: 2px; background: {{darkGreen}};\">\n      <section style=\"position: absolute; right: 0; top: -4px; width: 2px; height: 10px; background: {{darkGreen}};\"></section>\n    </section>\n  </section>\n</section>"
+    }
+  },
+  "options": {
+    "wrapH2Content": false,
+    "h2ContentBorder": false,
+    "h2ContentBorderColor": "{{primaryColor}}",
+    "h2ContentBackgroundColor": "{{primaryColorLight}}"
+  },
+  "usage": {
+    "description": "这是一个简洁通用的标题样式模板，所有级别的标题使用统一的设计风格，适合需要简洁统一风格的文档",
+    "variables": {
+      "{{iconUrl}}": "图标URL，使用模板中的iconUrl字段",
+      "{{bgImageUrl}}": "背景图片URL，使用模板中的bgImageUrl字段",
+      "{{text}}": "标题文本内容",
+      "{{index}}": "标题编号，自动生成",
+      "{{lightGreen}}": "浅绿色，使用colorTheme中的值",
+      "{{darkGreen}}": "深绿色，使用colorTheme中的值",
+      "{{yellow}}": "黄色，使用colorTheme中的值"
+    },
+    "applyMethod": "在渲染器中替换heading函数，使用对应的模板生成HTML"
+  }
+}

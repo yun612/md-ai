@@ -23,6 +23,11 @@
     "textLight": "rgba(0,0,0,.85)"
   },
   "headings": {
+    "h1": {
+      "name": "一级标题 - 优雅装饰+渐变背景",
+      "description": "带左侧装饰条、大号圆点图标和渐变背景的精美样式，比H2更突出优雅",
+      "template": "<section style=\"margin: 35px 0; position: relative;\" data-heading=\"true\" data-heading-depth=\"1\">\n  <section style=\"position: relative; display: inline-block; width: 100%;\">\n    <section style=\"position: absolute; left: 0; top: 0; bottom: 0; width: 5px; background: linear-gradient(to bottom, {{green2}}, {{green3}}); border-radius: 3px; z-index: 1;\"></section>\n    <section style=\"position: absolute; left: -22px; top: -15px; width: 32px; height: 32px; display: flex; justify-content: center; align-items: center; background: white; border-radius: 50%; border: 3px solid {{green2}}; z-index: 3; box-shadow: 0 4px 12px rgba(76, 175, 80, 0.25);\">\n      <img src=\"{{iconUrl}}\" style=\"width: 16px; height: 16px; vertical-align: middle;\" alt=\"\">\n    </section>\n    <section style=\"position: relative; background: linear-gradient(135deg, {{lightGreen1}} 0%, {{mintGreen}} 50%, {{lightGreen2}} 100%); background-image: url('{{bgImageUrl}}'); background-size: 100% 100%; background-blend-mode: soft-light; padding: 18px 28px 22px 40px; margin-left: 15px; border-radius: 8px; box-shadow: 0 4px 16px rgba(76, 175, 80, 0.15); z-index: 2;\">\n      <section style=\"color: rgba(0,0,0,.9); letter-spacing: 1.5px;\">\n        <p style=\"margin: 0; font-size: 26px; font-weight: 700; line-height: 1.5;\">{{text}}</p>\n      </section>\n    </section>\n    <section style=\"position: absolute; left: 20px; top: 0; bottom: 0; width: calc(100% - 20px); height: 100%; background: linear-gradient(135deg, {{lightGreen3}} 0%, {{seaGreen}} 100%); border-radius: 8px; transform: translateX(8px) translateY(4px); z-index: 0; opacity: 0.6;\"></section>\n  </section>\n</section>"
+    },
     "h2": {
       "name": "二级标题 - 装饰圆点+错位底色",
       "description": "带顶部装饰圆点、背景纹理和错位底色的精美样式",
@@ -31,7 +36,7 @@
     "h3": {
       "name": "三级标题 - 圆角矩形+左侧突出块",
       "description": "圆角矩形设计，左侧显示前两个字符作为装饰",
-      "template": "<section style=\"display: inline-flex; align-items: center; background: {{lightGreen2}}; border: 2px solid {{green1}}; border-radius: 50px; padding: 8px 16px; font-family: 'Arial', sans-serif;\" data-heading=\"true\" data-heading-depth=\"3\">\n  <section style=\"font-size: 24px; font-weight: bold; margin-right: 12px;\">{{text.slice(0, 2)}}</section>\n  <section style=\"font-size: 18px; font-weight: 500;\">{{text.slice(2)}}</section>\n</section>"
+      "template": "<section style=\"display: inline-block; background: {{lightGreen2}}; border: 2px solid {{green1}}; border-radius: 50px; padding: 8px 16px; font-family: 'Arial', sans-serif;\" data-heading=\"true\" data-heading-depth=\"3\">\n  <span style=\"font-size: 24px; font-weight: bold; margin-right: 12px; vertical-align: baseline;\">{{text.slice(0, 2)}}</span>\n  <span style=\"font-size: 18px; font-weight: 500; vertical-align: baseline;\">{{text.slice(2)}}</span>\n</section>"
     },
     "h4": {
       "name": "四级标题 - 下划线+圆圈",
@@ -48,6 +53,12 @@
       "description": "最简洁的圆角矩形设计，适合小标题",
       "template": "<section style=\"display: inline-flex; align-items: center; background: {{lightGreen1}}; border: 1.5px solid {{green3}}; border-radius: 35px; padding: 5px 10px; font-family: 'Arial', sans-serif; margin: 14px 0;\" data-heading=\"true\" data-heading-depth=\"6\">\n  <section style=\"font-size: 14px; font-weight: 500;\">{{text}}</section>\n</section>"
     }
+  },
+  "options": {
+    "wrapH2Content": true,
+    "h2ContentBorder": true,
+    "h2ContentBorderColor": "{{primaryColor}}",
+    "h2ContentBackgroundColor": "{{primaryColorLight}}"
   },
   "usage": {
     "description": "这是一个标题样式模板，包含H2-H6的精美样式设计",

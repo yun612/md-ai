@@ -32,11 +32,90 @@ export function renderMarkdown(raw: string, renderer: RendererAPI) {
  */
 
 /**
+ * 将十六进制颜色转换为 RGB
+ */
+function hexToRgb(hex: string): { r: number, g: number, b: number } | null {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
+  return result
+    ? {
+        r: Number.parseInt(result[1], 16),
+        g: Number.parseInt(result[2], 16),
+        b: Number.parseInt(result[3], 16),
+      }
+    : null
+}
+
+/**
+ * 生成带透明度的颜色（RGBA格式）
+ */
+function colorWithOpacity(hex: string, opacity: number): string {
+  const rgb = hexToRgb(hex)
+  if (!rgb) {
+    return hex
+  }
+  return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${opacity})`
+}
+
+/**
+ * 处理颜色变量，支持主题色变量
+ * @param color - 颜色值，支持 {{primaryColor}} 和 {{primaryColorLight}} 变量
+ * @param primaryColor - 主题色
+ * @param defaultColor - 默认颜色
+ * @returns 处理后的颜色值
+ */
+function resolveColor(color: string | undefined, primaryColor: string | undefined, defaultColor: string): string {
+  if (!color) {
+    return defaultColor
+  }
+
+  // 如果包含 {{primaryColorLight}} 变量，生成浅色透明背景
+  if (color.includes(`{{primaryColorLight}}`)) {
+    const resolvedColor = primaryColor || defaultColor
+    // 使用主题色生成带透明度的浅色背景（透明度约 0.1-0.15）
+    return color.replace(/\{\{primaryColorLight\}\}/g, colorWithOpacity(resolvedColor, 0.12))
+  }
+
+  // 如果包含 {{primaryColor}} 变量，替换为主题色
+  if (color.includes(`{{primaryColor}}`)) {
+    const resolvedColor = primaryColor || defaultColor
+    return color.replace(/\{\{primaryColor\}\}/g, resolvedColor)
+  }
+
+  // 如果是特殊标记，使用主题色
+  if (color === `primary` || color === `{{primary}}`) {
+    return primaryColor || defaultColor
+  }
+
+  // 如果是 primaryLight 标记，生成浅色透明背景
+  if (color === `primaryLight` || color === `{{primaryLight}}`) {
+    const resolvedColor = primaryColor || defaultColor
+    return colorWithOpacity(resolvedColor, 0.12)
+  }
+
+  return color
+}
+
+/**
  * 只包裹 H2 下的内容到容器中
  * @param html - HTML 字符串
+ * @param options - 配置选项
+ * @param options.enabled - 是否启用包裹功能
+ * @param options.border - 是否显示边框
+ * @param options.borderColor - 边框颜色
+ * @param options.backgroundColor - 背景颜色
+ * @param primaryColor - 主题色
  * @returns 处理后的 HTML 字符串
  */
-function wrapH2Content(html: string): string {
+function wrapH2Content(html: string, options?: {
+  enabled?: boolean
+  border?: boolean
+  borderColor?: string
+  backgroundColor?: string
+}, primaryColor?: string): string {
+  // 如果禁用了包裹功能，直接返回
+  if (options?.enabled === false) {
+    return html
+  }
   // 在浏览器环境中使用 DOM 操作，更精确
   if (typeof document !== `undefined`) {
     try {
@@ -70,14 +149,27 @@ function wrapH2Content(html: string): string {
           currentNode = nextSibling
         }
 
-        // 如果有内容，创建容器并包裹（使用天空蓝边框）
+        // 如果有内容，创建容器并包裹
         if (contentNodes.length > 0) {
-          const borderColor = `#87ceeb` // 天空蓝
+          const borderColor = resolveColor(options?.borderColor, primaryColor, `#87ceeb`) // 默认天空蓝，支持主题色
+          const backgroundColor = resolveColor(options?.backgroundColor, primaryColor, `#fafafa`) // 支持主题色
+          const showBorder = options?.border !== false // 默认显示边框
+
+          let containerStyle = `background-color: ${backgroundColor}; border-radius: 8px; padding: 20px; margin: 15px 0;`
+
+          if (showBorder) {
+            // 使用主题色生成阴影（如果边框色是主题色）
+            const shadowColor = borderColor === primaryColor
+              ? borderColor
+              : `rgba(135, 206, 235, 0.2)`
+            containerStyle += ` border: 3px solid ${borderColor}; box-shadow: 0 2px 8px ${shadowColor};`
+          }
+          else {
+            containerStyle += ` border: none;`
+          }
+
           const container = document.createElement(`section`)
-          container.setAttribute(
-            `style`,
-            `background-color: #fafafa; border: 3px solid ${borderColor}; border-radius: 8px; padding: 20px; margin: 15px 0; box-shadow: 0 2px 8px rgba(135, 206, 235, 0.2);`,
-          )
+          container.setAttribute(`style`, containerStyle)
 
           // 将所有内容节点移到容器中
           contentNodes.forEach((node) => {
@@ -100,13 +192,29 @@ function wrapH2Content(html: string): string {
   // 服务端环境，使用正则表达式回退方案
   const h2Pattern = /(<section[^>]*data-heading-depth="2"[^>]*>[\s\S]*?<\/section>)([\s\S]*?)(?=<section[^>]*data-heading-depth="[12]"[^>]*>|$)/g
 
-  return html.replace(h2Pattern, (match, h2Section, content) => {
+  return html.replace(h2Pattern, (_match, h2Section, content) => {
     const trimmedContent = content.trim()
     if (!trimmedContent)
       return h2Section
 
-    const borderColor = `#87ceeb` // 天空蓝
-    const container = `<section style="background-color: #fafafa; border: 3px solid ${borderColor}; border-radius: 8px; padding: 20px; margin: 15px 0; box-shadow: 0 2px 8px rgba(135, 206, 235, 0.2);">
+    const borderColor = resolveColor(options?.borderColor, primaryColor, `#87ceeb`) // 默认天空蓝，支持主题色
+    const backgroundColor = resolveColor(options?.backgroundColor, primaryColor, `#fafafa`) // 支持主题色
+    const showBorder = options?.border !== false // 默认显示边框
+
+    let containerStyle = `background-color: ${backgroundColor}; border-radius: 8px; padding: 20px; margin: 15px 0;`
+
+    if (showBorder) {
+      // 使用主题色生成阴影（如果边框色是主题色）
+      const shadowColor = borderColor === primaryColor
+        ? borderColor
+        : `rgba(135, 206, 235, 0.2)`
+      containerStyle += ` border: 3px solid ${borderColor}; box-shadow: 0 2px 8px ${shadowColor};`
+    }
+    else {
+      containerStyle += ` border: none;`
+    }
+
+    const container = `<section style="${containerStyle}">
 ${trimmedContent}
 </section>`
 
@@ -122,7 +230,17 @@ export function postProcessHtml(baseHtml: string, reading: ReadTimeResults, rend
   html = html.replace(/(style=".*?)"/, `$1;margin-top: 0"`)
 
   // 只包裹 H2 下的内容到容器
-  html = wrapH2Content(html)
+  const headingTemplate = renderer.getOpts().headingTemplate
+  const primaryColor = renderer.getOpts().primaryColor
+  const wrapOptions = headingTemplate?.options
+    ? {
+        enabled: headingTemplate.options.wrapH2Content !== false,
+        border: headingTemplate.options.h2ContentBorder !== false,
+        borderColor: headingTemplate.options.h2ContentBorderColor,
+        backgroundColor: headingTemplate.options.h2ContentBackgroundColor,
+      }
+    : undefined
+  html = wrapH2Content(html, wrapOptions, primaryColor)
 
   // 引用脚注
   html += renderer.buildFootnotes()

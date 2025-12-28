@@ -1,0 +1,82 @@
+{
+  "name": "演示文稿风格标题模板",
+  "description": "基于演示文稿风格的标题样式，H2采用右上角大号数字+装饰线条设计，H3采用左侧条形图+编号设计",
+  "version": "1.0.0",
+  "author": "md-ai",
+  "iconUrl": "https://mmbiz.uecloud.com.cn/sz_mmbiz_png/I1fyHmvzZiaXqWLwTRoib4mcGgQXe0uyNTqEWV7FyAZ2icPV08wW1v4MibjFeMbf9frCCVnibxzz0LzmkZA2PAyxOcQ/0?from=appmsg",
+  "bgImageUrl": "https://mmbiz.uecloud.com.cn/sz_mmbiz_png/I1fyHmvzZiaXqWLwTRoib4mcGgQXe0uyNTqEWV7FyAZ2icPV08wW1v4MibjFeMbf9frCCVnibxzz0LzmkZA2PAyxOcQ/0?from=appmsg",
+  "colorTheme": {
+    "orange1": "#ff6b35",
+    "orange2": "#ff8c5a",
+    "orange3": "#ffa680",
+    "orangeLight": "#ffe0d6",
+    "blue1": "#1e88e5",
+    "blue2": "#42a5f5",
+    "blue3": "#64b5f6",
+    "blueLight": "#e3f2fd",
+    "blueDark": "#1565c0",
+    "gray1": "#424242",
+    "gray2": "#616161",
+    "gray3": "#757575",
+    "grayLight": "#f5f5f5",
+    "beige": "#f5e6d3",
+    "text": "rgba(0,0,0,.9)",
+    "textLight": "rgba(0,0,0,.7)"
+  },
+  "headings": {
+    "h1": {
+      "name": "一级标题 - 居中大号数字+装饰",
+      "description": "演示文稿风格，居中显示超大号数字，上下有装饰线条，下方显示蓝色标题文字",
+      "template": "<section style=\"position: relative; margin: 40px 0; padding: 30px 0; text-align: center;\" data-heading=\"true\" data-heading-depth=\"1\">\n  <section style=\"display: flex; justify-content: center; align-items: center; margin-bottom: 20px; gap: 12px;\">\n    <section style=\"width: 50px; height: 3px; background: {{orange1}}; position: relative;\">\n      <section style=\"position: absolute; right: -5px; top: 50%; transform: translateY(-50%); width: 10px; height: 10px; background: {{orange1}}; border-radius: 50%;\"></section>\n    </section>\n    <section style=\"font-size: 72px; font-weight: 700; color: {{gray1}}; line-height: 1; font-family: 'Arial', 'Microsoft YaHei', sans-serif; letter-spacing: 4px;\">{{index}}</section>\n    <section style=\"width: 50px; height: 3px; background: {{orange1}}; position: relative;\">\n      <section style=\"position: absolute; left: -5px; top: 50%; transform: translateY(-50%); width: 10px; height: 10px; background: {{orange1}}; border-radius: 50%;\"></section>\n    </section>\n  </section>\n  <section style=\"margin-top: -5px;\">\n    <p style=\"margin: 0; font-size: 28px; font-weight: 700; color: {{blue1}}; font-family: 'Arial', 'Microsoft YaHei', sans-serif; letter-spacing: 2px;\">{{text}}</p>\n  </section>\n  <section style=\"display: flex; justify-content: center; align-items: center; margin-top: 15px; gap: 12px;\">\n    <section style=\"width: 50px; height: 2px; background: {{blue1}}; position: relative;\">\n      <section style=\"position: absolute; right: -4px; top: 50%; transform: translateY(-50%); width: 8px; height: 8px; background: {{blue1}}; border-radius: 50%;\"></section>\n    </section>\n    <section style=\"width: 50px; height: 2px; background: {{blue1}}; position: relative;\">\n      <section style=\"position: absolute; left: -4px; top: 50%; transform: translateY(-50%); width: 8px; height: 8px; background: {{blue1}}; border-radius: 50%;\"></section>\n    </section>\n  </section>\n</section>"
+    },
+    "h2": {
+      "name": "二级标题 - 右上角大号数字+装饰线条",
+      "description": "演示文稿风格，右上角显示大号数字，两侧有橙色装饰线条和点，下方显示蓝色标题文字",
+      "template": "<section style=\"position: relative; margin: 30px 0; padding: 20px 0; border: none; outline: none;\" data-heading=\"true\" data-heading-depth=\"2\">\n  <section style=\"display: flex; justify-content: flex-end; align-items: flex-start; margin-bottom: 15px; border: none; outline: none;\">\n    <section style=\"display: flex; align-items: center; gap: 8px; border: none; outline: none;\">\n      <section style=\"width: 30px; height: 2px; background: {{orange1}}; position: relative; border: none; outline: none;\">\n        <section style=\"position: absolute; right: -4px; top: 50%; transform: translateY(-50%); width: 8px; height: 8px; background: {{orange1}}; border-radius: 50%; border: none; outline: none;\"></section>\n      </section>\n      <section style=\"font-size: 48px; font-weight: 700; color: {{gray1}}; line-height: 1; font-family: 'Arial', 'Microsoft YaHei', sans-serif; border: none; outline: none;\">{{index}}</section>\n      <section style=\"width: 30px; height: 2px; background: {{orange1}}; position: relative; border: none; outline: none;\">\n        <section style=\"position: absolute; left: -4px; top: 50%; transform: translateY(-50%); width: 8px; height: 8px; background: {{orange1}}; border-radius: 50%; border: none; outline: none;\"></section>\n      </section>\n    </section>\n  </section>\n  <section style=\"text-align: right; margin-top: -10px; border: none; outline: none;\">\n    <p style=\"margin: 0; font-size: 20px; font-weight: 600; color: {{blue1}}; font-family: 'Arial', 'Microsoft YaHei', sans-serif; letter-spacing: 1px; border: none; outline: none;\">{{text}}</p>\n  </section>\n</section>"
+    },
+    "h3": {
+      "name": "三级标题 - 左侧条形图+编号",
+      "description": "演示文稿风格，左侧有垂直的蓝橙色条形图，右侧显示编号和蓝色标题文字",
+      "template": "<section style=\"display: flex; align-items: center; margin: 20px 0; gap: 12px;\" data-heading=\"true\" data-heading-depth=\"3\">\n  <section style=\"display: flex; flex-direction: column; width: 6px; height: 40px; flex-shrink: 0;\">\n    <section style=\"flex: 1; background: {{blue1}}; border-radius: 3px 3px 0 0;\"></section>\n    <section style=\"flex: 1; background: {{beige}}; border-radius: 0 0 3px 3px;\"></section>\n  </section>\n  <section style=\"display: flex; align-items: center; gap: 8px; flex: 1;\">\n    <section style=\"font-size: 16px; font-weight: 600; color: {{gray1}}; font-family: 'Arial', 'Microsoft YaHei', sans-serif;\">{{index}}</section>\n    <section style=\"font-size: 18px; font-weight: 500; color: {{blue1}}; font-family: 'Arial', 'Microsoft YaHei', sans-serif;\">{{text}}</section>\n  </section>\n</section>"
+    },
+    "h4": {
+      "name": "四级标题 - 简化条形图+编号",
+      "description": "基于H3风格的简化版本，左侧条形图更细，编号和文字更小，延续演示文稿风格",
+      "template": "<section style=\"display: flex; align-items: center; margin: 18px 0; gap: 10px;\" data-heading=\"true\" data-heading-depth=\"4\">\n  <section style=\"display: flex; flex-direction: column; width: 5px; height: 36px; flex-shrink: 0;\">\n    <section style=\"flex: 1; background: {{blue2}}; border-radius: 2.5px 2.5px 0 0;\"></section>\n    <section style=\"flex: 1; background: {{orangeLight}}; border-radius: 0 0 2.5px 2.5px;\"></section>\n  </section>\n  <section style=\"display: flex; align-items: center; gap: 8px; flex: 1;\">\n    <section style=\"font-size: 15px; font-weight: 600; color: {{gray2}}; font-family: 'Arial', 'Microsoft YaHei', sans-serif;\">{{index}}</section>\n    <section style=\"font-size: 17px; font-weight: 500; color: {{blue2}}; font-family: 'Arial', 'Microsoft YaHei', sans-serif;\">{{text}}</section>\n  </section>\n</section>"
+    },
+    "h5": {
+      "name": "五级标题 - 左侧细线+编号",
+      "description": "延续演示文稿风格，左侧有细线装饰，显示编号和文字",
+      "template": "<section style=\"display: flex; align-items: center; margin: 16px 0; gap: 10px;\" data-heading=\"true\" data-heading-depth=\"5\">\n  <section style=\"width: 3px; height: 28px; background: linear-gradient(to bottom, {{blue3}}, {{orangeLight}}); border-radius: 2px; flex-shrink: 0;\"></section>\n  <section style=\"display: flex; align-items: center; gap: 8px; flex: 1;\">\n    <section style=\"font-size: 14px; font-weight: 600; color: {{gray3}}; font-family: 'Arial', 'Microsoft YaHei', sans-serif;\">{{index}}</section>\n    <section style=\"font-size: 16px; font-weight: 500; color: {{blue3}}; font-family: 'Arial', 'Microsoft YaHei', sans-serif;\">{{text}}</section>\n  </section>\n</section>"
+    },
+    "h6": {
+      "name": "六级标题 - 左侧点+编号",
+      "description": "最简洁的演示文稿风格，左侧有装饰点，显示编号和文字",
+      "template": "<section style=\"display: flex; align-items: center; margin: 14px 0; gap: 10px;\" data-heading=\"true\" data-heading-depth=\"6\">\n  <section style=\"width: 6px; height: 6px; background: {{blue3}}; border-radius: 50%; flex-shrink: 0;\"></section>\n  <section style=\"display: flex; align-items: center; gap: 8px; flex: 1;\">\n    <section style=\"font-size: 13px; font-weight: 600; color: {{gray3}}; font-family: 'Arial', 'Microsoft YaHei', sans-serif;\">{{index}}</section>\n    <section style=\"font-size: 15px; font-weight: 500; color: {{blue3}}; font-family: 'Arial', 'Microsoft YaHei', sans-serif;\">{{text}}</section>\n  </section>\n</section>"
+    }
+  },
+  "options": {
+    "wrapH2Content": true,
+    "h2ContentBorder": false,
+    "h2ContentBorderColor": "{{primaryColor}}",
+    "h2ContentBackgroundColor": "{{primaryColorLight}}"
+  },
+  "usage": {
+    "description": "这是一个演示文稿风格的标题样式模板，H1采用居中超大号数字设计，H2采用右上角大号数字设计，H3-H6采用左侧装饰+编号设计",
+    "variables": {
+      "{{text}}": "标题文本内容",
+      "{{index}}": "标题序号（自动生成，如：03、3.1、3.1.1等）",
+      "{{orange1}}": "橙色1，使用colorTheme中的值",
+      "{{orange2}}": "橙色2，使用colorTheme中的值",
+      "{{orangeLight}}": "浅橙色，使用colorTheme中的值",
+      "{{blue1}}": "蓝色1，使用colorTheme中的值",
+      "{{blue2}}": "蓝色2，使用colorTheme中的值",
+      "{{blue3}}": "蓝色3，使用colorTheme中的值",
+      "{{blueLight}}": "浅蓝色，使用colorTheme中的值",
+      "{{gray1}}": "灰色1，使用colorTheme中的值",
+      "{{gray2}}": "灰色2，使用colorTheme中的值",
+      "{{beige}}": "米色，使用colorTheme中的值"
+    },
+    "applyMethod": "在渲染器中替换heading函数，使用对应的模板生成HTML，需要自动生成标题序号"
+  }
+}

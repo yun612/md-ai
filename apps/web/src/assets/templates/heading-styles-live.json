@@ -1,0 +1,79 @@
+{
+  "name": "生活Live风格标题模板",
+  "description": "轻松活泼的生活化风格，采用浅蓝色气泡、云朵、铅笔等装饰元素，适合生活类内容",
+  "version": "1.0.0",
+  "author": "md-ai",
+  "iconUrl": "https://mmbiz.uecloud.com.cn/sz_mmbiz_png/I1fyHmvzZiaXqWLwTRoib4mcGgQXe0uyNTqEWV7FyAZ2icPV08wW1v4MibjFeMbf9frCCVnibxzz0LzmkZA2PAyxOcQ/0?from=appmsg",
+  "bgImageUrl": "https://mmbiz.uecloud.com.cn/sz_mmbiz_png/I1fyHmvzZiaXqWLwTRoib4mcGgQXe0uyNTqEWV7FyAZ2icPV08wW1v4MibjFeMbf9frCCVnibxzz0LzmkZA2PAyxOcQ/0?from=appmsg",
+  "colorTheme": {
+    "lightBlue1": "#e0f2f7",
+    "lightBlue2": "#b3e5fc",
+    "lightBlue3": "#81d4fa",
+    "blue1": "#42a5f5",
+    "blue2": "#1e88e5",
+    "blue3": "#1565c0",
+    "pink1": "#fce4ec",
+    "pink2": "#f8bbd0",
+    "pink3": "#f48fb1",
+    "purple1": "#e1bee7",
+    "purple2": "#ce93d8",
+    "yellow1": "#fff9c4",
+    "yellow2": "#fff59d",
+    "cloudBlue": "#b3e5fc",
+    "bubbleBlue": "#e0f2f7",
+    "textBlue": "#42a5f5",
+    "text": "rgba(0,0,0,.9)",
+    "textLight": "rgba(0,0,0,.7)"
+  },
+  "headings": {
+    "h1": {
+      "name": "一级标题 - 气泡对话框+云朵装饰",
+      "description": "浅蓝色圆角气泡，左侧云朵装饰，右侧铅笔装饰，轻松活泼的生活化风格",
+      "template": "<section style=\"position: relative; margin: 40px 0; display: flex; align-items: center; justify-content: center;\" data-heading=\"true\" data-heading-depth=\"1\">\n  <section style=\"position: relative; display: inline-block;\">\n    <section style=\"position: absolute; left: -60px; top: -25px; width: 50px; height: 35px; background: {{cloudBlue}}; border-radius: 50px 50px 50px 0; opacity: 0.9; z-index: 1; box-shadow: 0 2px 8px rgba(179, 229, 252, 0.4);\"></section>\n    <section style=\"position: absolute; left: -45px; top: -40px; width: 30px; height: 25px; background: {{cloudBlue}}; border-radius: 50px 50px 50px 0; opacity: 0.7; z-index: 0; box-shadow: 0 2px 6px rgba(179, 229, 252, 0.3);\"></section>\n    <section style=\"position: relative; background: {{bubbleBlue}}; border-radius: 25px; padding: 22px 40px; box-shadow: 0 6px 20px rgba(66, 165, 245, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.5); z-index: 2; border: 2px solid rgba(255, 255, 255, 0.6);\">\n      <section style=\"color: {{textBlue}}; font-size: 30px; font-weight: 700; letter-spacing: 1.5px; font-family: 'Arial', 'Microsoft YaHei', sans-serif; text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8);\">\n        <p style=\"margin: 0;\">{{text}}</p>\n      </section>\n    </section>\n    <section style=\"position: absolute; right: -50px; top: 8px; width: 40px; height: 5px; background: linear-gradient(135deg, {{pink3}}, {{purple2}}); border-radius: 3px; transform: rotate(-45deg); z-index: 3; box-shadow: 0 2px 6px rgba(244, 143, 177, 0.4);\"></section>\n    <section style=\"position: absolute; right: -38px; top: 28px; width: 30px; height: 4px; background: linear-gradient(135deg, {{pink2}}, {{pink3}}); border-radius: 2px; transform: rotate(-30deg); z-index: 2; box-shadow: 0 2px 4px rgba(248, 187, 208, 0.3);\"></section>\n    <section style=\"position: absolute; right: -42px; top: 18px; width: 3px; height: 20px; background: linear-gradient(to bottom, {{yellow2}}, {{yellow1}}); border-radius: 2px; transform: rotate(-45deg); z-index: 4; box-shadow: 0 1px 3px rgba(255, 245, 157, 0.5);\"></section>\n  </section>\n</section>"
+    },
+    "h2": {
+      "name": "二级标题 - 圆角气泡+波浪线",
+      "description": "浅蓝色圆角气泡，底部有波浪线装饰，简洁优雅",
+      "template": "<section style=\"position: relative; margin: 28px 0; display: inline-block;\" data-heading=\"true\" data-heading-depth=\"2\">\n  <section style=\"position: relative; background: {{bubbleBlue}}; border-radius: 18px; padding: 16px 32px; box-shadow: 0 4px 15px rgba(66, 165, 245, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.5); border: 2px solid rgba(255, 255, 255, 0.5);\">\n    <section style=\"color: {{textBlue}}; font-size: 24px; font-weight: 600; letter-spacing: 0.8px; font-family: 'Arial', 'Microsoft YaHei', sans-serif; text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8);\">\n      <p style=\"margin: 0;\">{{text}}</p>\n    </section>\n  </section>\n  <section style=\"position: absolute; bottom: -10px; left: 15px; right: 15px; height: 8px; background: linear-gradient(to right, transparent, {{pink2}} 20%, {{pink3}} 40%, {{purple2}} 60%, {{pink3}} 80%, {{pink2}} 100%, transparent); border-radius: 4px; opacity: 0.8; box-shadow: 0 2px 6px rgba(244, 143, 177, 0.3);\"></section>\n  <section style=\"position: absolute; bottom: -6px; left: 25px; right: 25px; height: 4px; background: linear-gradient(to right, transparent, {{yellow2}}, {{yellow1}}, {{yellow2}}, transparent); border-radius: 2px; opacity: 0.6;\"></section>\n</section>"
+    },
+    "h3": {
+      "name": "三级标题 - 左侧圆点+气泡",
+      "description": "左侧彩色圆点装饰，右侧浅蓝色气泡，活泼可爱",
+      "template": "<section style=\"display: flex; align-items: center; margin: 22px 0; gap: 14px;\" data-heading=\"true\" data-heading-depth=\"3\">\n  <section style=\"position: relative; width: 16px; height: 16px; background: linear-gradient(135deg, {{blue1}}, {{blue2}}); border-radius: 50%; flex-shrink: 0; box-shadow: 0 3px 8px rgba(66, 165, 245, 0.4), inset 0 1px 2px rgba(255, 255, 255, 0.3);\">\n    <section style=\"position: absolute; top: 3px; left: 3px; width: 6px; height: 6px; background: rgba(255, 255, 255, 0.6); border-radius: 50%;\"></section>\n  </section>\n  <section style=\"flex: 1; background: {{bubbleBlue}}; border-radius: 15px; padding: 12px 24px; box-shadow: 0 3px 12px rgba(66, 165, 245, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.5); border: 1.5px solid rgba(255, 255, 255, 0.6);\">\n    <section style=\"color: {{textBlue}}; font-size: 20px; font-weight: 600; letter-spacing: 0.5px; font-family: 'Arial', 'Microsoft YaHei', sans-serif; text-shadow: 0 1px 1px rgba(255, 255, 255, 0.8);\">\n      <p style=\"margin: 0;\">{{text}}</p>\n    </section>\n  </section>\n</section>"
+    },
+    "h4": {
+      "name": "四级标题 - 下划线+圆点",
+      "description": "左侧小圆点，右侧文字带下划线装饰，简洁清新",
+      "template": "<section style=\"display: inline-flex; align-items: center; margin: 18px 0; gap: 12px;\" data-heading=\"true\" data-heading-depth=\"4\">\n  <section style=\"width: 10px; height: 10px; background: linear-gradient(135deg, {{blue1}}, {{blue2}}); border-radius: 50%; flex-shrink: 0; box-shadow: 0 2px 4px rgba(66, 165, 245, 0.3);\">\n    <section style=\"width: 4px; height: 4px; background: rgba(255, 255, 255, 0.6); border-radius: 50%; margin: 3px;\"></section>\n  </section>\n  <section style=\"color: {{textBlue}}; font-size: 18px; font-weight: 600; letter-spacing: 0.4px; font-family: 'Arial', 'Microsoft YaHei', sans-serif; padding-bottom: 8px; border-bottom: 3px solid {{lightBlue3}}; box-shadow: 0 2px 0 {{pink2}};\">\n    {{text}}\n  </section>\n</section>"
+    },
+    "h5": {
+      "name": "五级标题 - 圆角标签",
+      "description": "浅蓝色圆角标签样式，小巧精致",
+      "template": "<section style=\"display: inline-block; background: linear-gradient(135deg, {{bubbleBlue}}, {{lightBlue2}}); border-radius: 22px; padding: 8px 18px; margin: 16px 0; box-shadow: 0 3px 10px rgba(66, 165, 245, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.5); border: 1.5px solid rgba(255, 255, 255, 0.6);\" data-heading=\"true\" data-heading-depth=\"5\">\n  <section style=\"color: {{textBlue}}; font-size: 16px; font-weight: 600; letter-spacing: 0.3px; font-family: 'Arial', 'Microsoft YaHei', sans-serif; text-shadow: 0 1px 1px rgba(255, 255, 255, 0.8);\">\n    {{text}}\n  </section>\n</section>"
+    },
+    "h6": {
+      "name": "六级标题 - 简约圆点",
+      "description": "左侧小圆点，右侧文字，最简洁的设计",
+      "template": "<section style=\"display: inline-flex; align-items: center; margin: 14px 0; gap: 10px;\" data-heading=\"true\" data-heading-depth=\"6\">\n  <section style=\"width: 8px; height: 8px; background: linear-gradient(135deg, {{blue1}}, {{blue2}}); border-radius: 50%; flex-shrink: 0; box-shadow: 0 2px 4px rgba(66, 165, 245, 0.3);\">\n    <section style=\"width: 3px; height: 3px; background: rgba(255, 255, 255, 0.7); border-radius: 50%; margin: 2.5px;\"></section>\n  </section>\n  <section style=\"color: {{textBlue}}; font-size: 15px; font-weight: 600; letter-spacing: 0.2px; font-family: 'Arial', 'Microsoft YaHei', sans-serif;\">\n    {{text}}\n  </section>\n</section>"
+    }
+  },
+  "options": {
+    "wrapH2Content": true,
+    "h2ContentBorder": false,
+    "h2ContentBorderColor": "{{primaryColor}}",
+    "h2ContentBackgroundColor": "{{primaryColorLight}}"
+  },
+  "usage": {
+    "description": "这是一个生活化风格的标题样式模板，采用浅蓝色气泡、云朵、铅笔等装饰元素，适合生活类、轻松活泼的内容",
+    "variables": {
+      "{{iconUrl}}": "图标URL，使用模板中的iconUrl字段",
+      "{{bgImageUrl}}": "背景图片URL，使用模板中的bgImageUrl字段",
+      "{{text}}": "标题文本内容",
+      "{{index}}": "标题编号，自动生成",
+      "{{bubbleBlue}}": "气泡蓝色，使用colorTheme中的值",
+      "{{cloudBlue}}": "云朵蓝色，使用colorTheme中的值",
+      "{{textBlue}}": "文字蓝色，使用colorTheme中的值"
+    },
+    "applyMethod": "在渲染器中替换heading函数，使用对应的模板生成HTML"
+  }
+}

@@ -15,11 +15,18 @@ export interface HeadingStylesConfig {
   bgImageUrl: string
   colorTheme: Record<string, string>
   headings: {
+    h1?: HeadingTemplate
     h2: HeadingTemplate
     h3: HeadingTemplate
     h4: HeadingTemplate
     h5: HeadingTemplate
     h6: HeadingTemplate
+  }
+  options?: {
+    wrapH2Content?: boolean
+    h2ContentBorder?: boolean
+    h2ContentBorderColor?: string
+    h2ContentBackgroundColor?: string
   }
 }
 
@@ -30,20 +37,31 @@ export function replaceTemplateVariables(
   text: string,
   config: HeadingStylesConfig,
   primaryColor?: string,
+  index?: string,
 ): string {
   let result = template
 
-  const sliceRegex = /\{\{text\.slice\((\d+),\s*(\d+)\)\}\}/g
+  // 支持两种格式：{{text.slice(start, end)}} 和 {{text.slice(start)}}
+  const sliceRegex = /\{\{text\.slice\((\d+)(?:,\s*(\d+))?\)\}\}/g
   result = result.replace(sliceRegex, (_match, start, end) => {
     const startNum = Number.parseInt(start)
-    const endNum = Number.parseInt(end)
-    return text.slice(startNum, endNum)
+    if (end !== undefined) {
+      const endNum = Number.parseInt(end)
+      return text.slice(startNum, endNum)
+    }
+    else {
+      return text.slice(startNum)
+    }
   })
 
   result = result
     .replace(/\{\{iconUrl\}\}/g, config.iconUrl)
     .replace(/\{\{bgImageUrl\}\}/g, config.bgImageUrl)
     .replace(/\{\{text\}\}/g, text)
+
+  if (index !== undefined) {
+    result = result.replace(/\{\{index\}\}/g, index)
+  }
 
   const generatedTheme = primaryColor ? generateColorTheme(primaryColor) : null
   const colorTheme = generatedTheme || config.colorTheme
@@ -57,19 +75,39 @@ export function replaceTemplateVariables(
 }
 
 export function generateHeadingHTML(
-  level: 2 | 3 | 4 | 5 | 6,
+  level: 1 | 2 | 3 | 4 | 5 | 6,
   text: string,
   config: HeadingStylesConfig,
   primaryColor?: string,
+  index?: string,
 ): string {
-  const headingKey = `h${level}` as keyof typeof config.headings
+  // 明确检查 h1-h6 是否存在，支持 h1 可选的情况
+  let headingTemplate: HeadingTemplate | undefined
+  if (level === 1) {
+    headingTemplate = config.headings.h1
+  }
+  else if (level === 2) {
+    headingTemplate = config.headings.h2
+  }
+  else if (level === 3) {
+    headingTemplate = config.headings.h3
+  }
+  else if (level === 4) {
+    headingTemplate = config.headings.h4
+  }
+  else if (level === 5) {
+    headingTemplate = config.headings.h5
+  }
+  else if (level === 6) {
+    headingTemplate = config.headings.h6
+  }
 
-  if (!config.headings[headingKey]) {
+  if (!headingTemplate || !headingTemplate.template) {
     return `<h${level}>${text}</h${level}>`
   }
 
-  const template = config.headings[headingKey].template
-  return replaceTemplateVariables(template, text, config, primaryColor)
+  const template = headingTemplate.template
+  return replaceTemplateVariables(template, text, config, primaryColor, index)
 }
 
 export function getDefaultTemplate(): HeadingStylesConfig {
@@ -123,6 +161,12 @@ export function getDefaultTemplate(): HeadingStylesConfig {
         description: `最简洁的圆角矩形设计，适合小标题`,
         template: `<section style="display: inline-flex; align-items: center; background: {{lightGreen1}}; border: 1.5px solid {{green3}}; border-radius: 35px; padding: 5px 10px; font-family: 'Arial', sans-serif; margin: 14px 0;" data-heading="true" data-heading-depth="6">\n  <section style="font-size: 14px; font-weight: 500;">{{text}}</section>\n</section>`,
       },
+    },
+    options: {
+      wrapH2Content: true,
+      h2ContentBorder: true,
+      h2ContentBorderColor: `{{primaryColor}}`,
+      h2ContentBackgroundColor: `{{primaryColorLight}}`,
     },
   }
 }

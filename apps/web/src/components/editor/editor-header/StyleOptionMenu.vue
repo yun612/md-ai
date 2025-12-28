@@ -36,10 +36,11 @@ function setStyle(title: string, value: string) {
         :model-value="value"
         class="w-50"
         :checked="current === value"
+        :title="title === '标题模板' && desc ? desc : undefined"
         @click="change(value)"
       >
         {{ label }}
-        <DropdownMenuShortcut :style="setStyle(title, value)">
+        <DropdownMenuShortcut v-if="title !== '标题模板'" :style="setStyle(title, value)">
           {{ desc }}
         </DropdownMenuShortcut>
       </MenubarCheckboxItem>

@@ -164,6 +164,46 @@ export function initRenderer(initialOpts: IOpts): RendererAPI {
   let codeIndex: number = 0
   const listOrderedStack: boolean[] = []
   const listCounters: number[] = []
+  const headingCounters: number[] = [0, 0, 0, 0, 0, 0, 0]
+
+  function generateHeadingIndex(depth: number): string {
+    if (depth < 1 || depth > 6) {
+      return ``
+    }
+
+    const level = depth - 1
+
+    if (level === 0) {
+      headingCounters[0]++
+      for (let i = 1; i < 6; i++) {
+        headingCounters[i] = 0
+      }
+      return String(headingCounters[0]).padStart(2, `0`)
+    }
+
+    if (level === 1) {
+      headingCounters[1]++
+      headingCounters[2] = 0
+      headingCounters[3] = 0
+      headingCounters[4] = 0
+      headingCounters[5] = 0
+      return String(headingCounters[1]).padStart(2, `0`)
+    }
+
+    headingCounters[level]++
+    for (let i = level + 1; i < 6; i++) {
+      headingCounters[i] = 0
+    }
+
+    const parts: string[] = []
+    for (let i = 1; i <= level; i++) {
+      if (headingCounters[i] > 0) {
+        parts.push(String(headingCounters[i]))
+      }
+    }
+
+    return parts.join(`.`)
+  }
 
   function getOpts(): IOpts {
     return opts
@@ -194,6 +234,10 @@ export function initRenderer(initialOpts: IOpts): RendererAPI {
   function reset(newOpts: Partial<IOpts>): void {
     footnotes.length = 0
     footnoteIndex = 0
+    // 重置所有标题计数器
+    for (let i = 0; i < headingCounters.length; i++) {
+      headingCounters[i] = 0
+    }
     setOptions(newOpts)
   }
 
@@ -375,17 +419,20 @@ export function initRenderer(initialOpts: IOpts): RendererAPI {
     heading({ tokens, depth }: Tokens.Heading) {
       const text = this.parser.parseInline(tokens)
 
-      // 如果提供了自定义模板，使用模板生成 H2-H6 标题
-      if (opts.headingTemplate && depth >= 2 && depth <= 6) {
+      // 如果提供了自定义模板，完全使用模板系统生成 H1-H6 标题
+      // 这样所有级别都可以通过模板配置，不会回退到内置模板
+      if (opts.headingTemplate && depth >= 1 && depth <= 6) {
+        const index = generateHeadingIndex(depth)
         return generateHeadingHTML(
-          depth as 2 | 3 | 4 | 5 | 6,
+          depth as 1 | 2 | 3 | 4 | 5 | 6,
           text,
           opts.headingTemplate,
           opts.primaryColor,
+          index,
         )
       }
 
-      // 使用内置模板生成 H1-H6 标题
+      // 如果没有提供自定义模板，使用内置模板生成 H1-H6 标题
       if (depth >= 1 && depth <= 6) {
         return generateHeadingTemplate(depth, text)
       }

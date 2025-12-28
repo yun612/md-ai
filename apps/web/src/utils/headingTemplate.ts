@@ -15,11 +15,18 @@ export interface HeadingStylesConfig {
   bgImageUrl: string
   colorTheme: Record<string, string>
   headings: {
+    h1?: HeadingTemplate
     h2: HeadingTemplate
     h3: HeadingTemplate
     h4: HeadingTemplate
     h5: HeadingTemplate
     h6: HeadingTemplate
+  }
+  options?: {
+    wrapH2Content?: boolean
+    h2ContentBorder?: boolean
+    h2ContentBorderColor?: string
+    h2ContentBackgroundColor?: string
   }
 }
 
@@ -112,15 +119,21 @@ export function replaceTemplateVariables(
   text: string,
   config: HeadingStylesConfig,
   primaryColor?: string,
+  index?: string,
 ): string {
   let result = template
 
-  // 先处理 text.slice 表达式
-  const sliceRegex = /\{\{text\.slice\((\d+),\s*(\d+)\)\}\}/g
+  // 先处理 text.slice 表达式，支持两种格式：{{text.slice(start, end)}} 和 {{text.slice(start)}}
+  const sliceRegex = /\{\{text\.slice\((\d+)(?:,\s*(\d+))?\)\}\}/g
   result = result.replace(sliceRegex, (_match, start, end) => {
     const startNum = Number.parseInt(start)
-    const endNum = Number.parseInt(end)
-    return text.slice(startNum, endNum)
+    if (end !== undefined) {
+      const endNum = Number.parseInt(end)
+      return text.slice(startNum, endNum)
+    }
+    else {
+      return text.slice(startNum)
+    }
   })
 
   // 替换其他变量
@@ -128,6 +141,10 @@ export function replaceTemplateVariables(
     .replace(/\{\{iconUrl\}\}/g, config.iconUrl)
     .replace(/\{\{bgImageUrl\}\}/g, config.bgImageUrl)
     .replace(/\{\{text\}\}/g, text)
+
+  if (index !== undefined) {
+    result = result.replace(/\{\{index\}\}/g, index)
+  }
 
   // 替换颜色主题变量
   const generatedTheme = primaryColor ? generateColorTheme(primaryColor) : null
@@ -142,20 +159,41 @@ export function replaceTemplateVariables(
 }
 
 export function generateHeadingHTML(
-  level: 2 | 3 | 4 | 5 | 6,
+  level: 1 | 2 | 3 | 4 | 5 | 6,
   text: string,
   config?: HeadingStylesConfig,
   primaryColor?: string,
+  index?: string,
 ): string {
   const templateConfig = config || loadHeadingTemplateSync()
-  const headingKey = `h${level}` as keyof typeof templateConfig.headings
 
-  if (!templateConfig.headings[headingKey]) {
+  // 明确检查 h1-h6 是否存在，支持 h1 可选的情况
+  let headingTemplate: HeadingTemplate | undefined
+  if (level === 1) {
+    headingTemplate = templateConfig.headings.h1
+  }
+  else if (level === 2) {
+    headingTemplate = templateConfig.headings.h2
+  }
+  else if (level === 3) {
+    headingTemplate = templateConfig.headings.h3
+  }
+  else if (level === 4) {
+    headingTemplate = templateConfig.headings.h4
+  }
+  else if (level === 5) {
+    headingTemplate = templateConfig.headings.h5
+  }
+  else if (level === 6) {
+    headingTemplate = templateConfig.headings.h6
+  }
+
+  if (!headingTemplate || !headingTemplate.template) {
     return `<h${level}>${text}</h${level}>`
   }
 
-  const template = templateConfig.headings[headingKey].template
-  return replaceTemplateVariables(template, text, templateConfig, primaryColor)
+  const template = headingTemplate.template
+  return replaceTemplateVariables(template, text, templateConfig, primaryColor, index)
 }
 
 export function getAllTemplates(): HeadingTemplate[] {

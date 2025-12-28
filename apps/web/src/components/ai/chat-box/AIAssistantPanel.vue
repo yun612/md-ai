@@ -75,6 +75,7 @@ const { apiKey, endpoint, model, temperature, maxToken, type } = storeToRefs(AIC
 /* ---------- 快捷指令 ---------- */
 const quickCmdStore = useQuickCommands()
 
+// 选中文字，点击指令，可以把文字复制过去
 function getSelectedText(): string {
   try {
     const cm: any = editor.value
