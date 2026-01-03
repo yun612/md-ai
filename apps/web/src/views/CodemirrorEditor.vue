@@ -10,6 +10,8 @@ import imageCompression from 'browser-image-compression'
 import { Eye, Pen } from 'lucide-vue-next'
 import { SidebarAIToolbar } from '@/components/ai'
 import AIAssistantSidebar from '@/components/ai/AIAssistantSidebar.vue'
+import { HtmlEditorView, useHtmlEditorStore } from '@/components/editor/html-editor'
+
 import {
   ResizableHandle,
   ResizablePanel,
@@ -33,12 +35,15 @@ const themeStore = useThemeStore()
 const uiStore = useUIStore()
 const cssEditorStore = useCssEditorStore()
 const displayStore = useDisplayStore()
+const htmlEditorStore = useHtmlEditorStore()
 
 const { editor } = storeToRefs(editorStore)
 const { output } = storeToRefs(renderStore)
 const { isDark } = storeToRefs(uiStore)
 const { posts, currentPostIndex } = storeToRefs(postStore)
 const { previewWidth } = storeToRefs(themeStore)
+const { isHtmlMode, htmlContent } = storeToRefs(htmlEditorStore)
+
 const {
   isMobile,
   isEditOnLeft,
@@ -54,7 +59,14 @@ const { toggleShowUploadImgDialog } = displayStore
 function editorRefresh() {
   themeStore.updateCodeTheme()
 
-  const raw = editorStore.getContent()
+  // const raw = editorStore.getContent()
+  let raw: string
+  if (isHtmlMode.value) {
+    raw = htmlEditorStore.htmlContent
+  }
+  else {
+    raw = editorStore.getContent()
+  }
   renderStore.render(raw, {
     isCiteStatus: themeStore.isCiteStatus,
     legend: themeStore.legend,
@@ -116,10 +128,12 @@ function toggleView() {
 // AI 工具箱已移到侧边栏
 
 const previewRef = useTemplateRef<HTMLDivElement>(`previewRef`)
+const htmlEditorRef = useTemplateRef<InstanceType<typeof HtmlEditorView>>(`htmlEditorRef`)
 
 const timeout = ref<NodeJS.Timeout>()
 const codeMirrorView = ref<EditorView | null>(null)
 const themeCompartment = new Compartment()
+const changeTimer = ref<NodeJS.Timeout>()
 
 // 使浏览区与编辑区滚动条建立同步联系
 function leftAndRightScroll() {
@@ -466,7 +480,63 @@ function mdLocalToRemote() {
   }
 }
 
-const changeTimer = ref<NodeJS.Timeout>()
+// html 内容变化
+function handleHtmlContentChange(content: string) {
+  const currentPost = posts.value[currentPostIndex.value]
+  if (!currentPost)
+    return
+
+  clearTimeout(changeTimer.value)
+  changeTimer.value = setTimeout(() => {
+    if (content !== currentPost.content) {
+      currentPost.content = content
+      currentPost.updateDatetime = new Date()
+    }
+    editorRefresh()
+  }, 300)
+}
+
+watch(isHtmlMode, (newMode) => {
+  const currentPost = posts.value[currentPostIndex.value]
+  if (!currentPost)
+    return
+
+  if (newMode) {
+    htmlEditorStore.setHtmlContent(currentPost.content)
+    nextTick(() => {
+      const editorRef = htmlEditorRef.value
+      if (editorRef?.setContent) {
+        editorRef.setContent(currentPost.content)
+      }
+      editorRefresh()
+    })
+  }
+  else {
+    if (codeMirrorView.value) {
+      const currentContent = codeMirrorView.value.state.doc.toString()
+      if (currentContent !== currentPost.content) {
+        codeMirrorView.value.dispatch({
+          changes: {
+            from: 0,
+            to: codeMirrorView.value.state.doc.length,
+            insert: currentPost.content,
+          },
+        })
+      }
+    }
+    editorRefresh()
+  }
+})
+
+// 监听html内容变化
+watch(htmlContent, (newContent) => {
+  if (isHtmlMode.value) {
+    handleHtmlContentChange(newContent)
+  // codeMirrorView.value?.dispatch({
+  //   changes: { from: 0, to: codeMirrorView.value.state.doc.length, insert: newContent },
+  // })
+  }
+})
 
 const editorRef = useTemplateRef<HTMLDivElement>(`editorRef`)
 const progressValue = ref(0)
@@ -571,10 +641,17 @@ onMounted(() => {
   )
 
   nextTick(() => {
-    const editorView = createFormTextArea(editorDom)
-    editor.value = editorView
+    if (isHtmlMode.value) {
+      const currentPost = posts.value[currentPostIndex.value]
+      if (currentPost) {
+        htmlEditorStore.setHtmlContent(currentPost.content)
+      }
+    }
+    else {
+      const editorView = createFormTextArea(editorDom)
+      editor.value = editorView
+    }
 
-    // AI 工具箱已移到侧边栏，不再需要初始化编辑器事件
     editorRefresh()
     mdLocalToRemote()
   })
@@ -591,27 +668,37 @@ watch(isDark, () => {
 
 // 监听当前文章切换，更新编辑器内容
 watch(currentPostIndex, () => {
-  if (!codeMirrorView.value)
-    return
-
   const currentPost = posts.value[currentPostIndex.value]
   if (!currentPost)
     return
 
-  const currentContent = codeMirrorView.value.state.doc.toString()
-
-  // 只有当内容不同时才更新，避免不必要的更新
-  if (currentContent !== currentPost.content) {
-    codeMirrorView.value.dispatch({
-      changes: {
-        from: 0,
-        to: codeMirrorView.value.state.doc.length,
-        insert: currentPost.content,
-      },
+  if (isHtmlMode.value) {
+    htmlEditorStore.setHtmlContent(currentPost.content)
+    nextTick(() => {
+      const editorRef = htmlEditorRef.value
+      if (editorRef?.setContent) {
+        editorRef.setContent(currentPost.content)
+      }
     })
-
-    // 更新编辑器后刷新渲染
     editorRefresh()
+  }
+  else {
+    if (!codeMirrorView.value)
+      return
+
+    const currentContent = codeMirrorView.value.state.doc.toString()
+
+    if (currentContent !== currentPost.content) {
+      codeMirrorView.value.dispatch({
+        changes: {
+          from: 0,
+          to: codeMirrorView.value.state.doc.length,
+          insert: currentPost.content,
+        },
+      })
+
+      editorRefresh()
+    }
   }
 })
 
@@ -681,19 +768,25 @@ onUnmounted(() => {
                 'border-r': isEditOnLeft,
               }"
             >
-              <SearchTab v-if="codeMirrorView" ref="searchTabRef" :editor-view="codeMirrorView as any" />
+              <SearchTab v-if="codeMirrorView && !isHtmlMode" ref="searchTabRef" :editor-view="codeMirrorView as any" />
               <SidebarAIToolbar
                 :is-mobile="isMobile"
                 :show-editor="showEditor"
               />
 
-              <EditorContextMenu>
+              <EditorContextMenu v-if="!isHtmlMode">
                 <div
                   id="editor"
                   ref="editorRef"
                   class="codemirror-container"
                 />
               </EditorContextMenu>
+              <div v-else class="html-editor-wrapper h-full">
+                <HtmlEditorView
+                  ref="htmlEditorRef"
+                  @content-change="handleHtmlContentChange"
+                />
+              </div>
             </div>
             <div
               v-show="!isMobile || (isMobile && !showEditor)"
@@ -846,6 +939,11 @@ onUnmounted(() => {
 .codeMirror-wrapper,
 .preview-wrapper {
   height: 100%;
+}
+
+.html-editor-wrapper {
+  height: 100%;
+  overflow: hidden;
 }
 
 .codeMirror-wrapper {

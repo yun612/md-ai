@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import type { ModelConfig } from '@/tasks'
 import { Bot, ChevronDownIcon, Menu, Palette, SlidersHorizontal } from 'lucide-vue-next'
+import { HtmlEditorToolbar } from '@/components/editor/html-editor'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useAIConfigStore } from '@/stores/aiConfig'
 import { useDisplayStore } from '@/stores/display'
@@ -9,7 +9,6 @@ import { useExportStore } from '@/stores/export'
 import { useRenderStore } from '@/stores/render'
 import { useThemeStore } from '@/stores/theme'
 import { useUIStore } from '@/stores/ui'
-import { startTaskWithStreaming } from '@/tasks'
 import { addPrefix, generatePureHTML, processClipboardContent } from '@/utils'
 import FormatDropdown from './FormatDropdown.vue'
 
@@ -292,7 +291,7 @@ async function copy() {
     class="header-container h-15 flex flex-wrap items-center justify-between px-5 relative"
   >
     <!-- 桌面端左侧菜单 -->
-    <div class="space-x-2 hidden md:flex">
+    <div class="space-x-2 hidden md:flex items-center">
       <Menubar class="menubar border-0">
         <FileDropdown @open-editor-state="handleOpenEditorState" />
         <FormatDropdown />
@@ -300,6 +299,7 @@ async function copy() {
         <StyleDropdown />
         <HelpDropdown @open-about="handleOpenAbout" @open-fund="handleOpenFund" />
       </Menubar>
+      <HtmlEditorToolbar class="ml-2" />
     </div>
 
     <!-- 移动端汉堡菜单按钮 -->

@@ -1,5 +1,6 @@
 import { initRenderer } from '@md/core'
 import { themeMap } from '@md/shared/configs'
+import { useHtmlEditorStore } from '@/components/editor/html-editor/useHtmlEditorStore'
 import { css2json, customCssWithTemplate, customizeTheme, postProcessHtml, renderMarkdown } from '@/utils'
 import { useHeadingTemplateStore } from './headingTemplate'
 import { useThemeStore } from './theme'
@@ -89,8 +90,93 @@ export const useRenderStore = defineStore(`render`, () => {
     output.value = div.innerHTML
   }
 
+  // 从完整HTML文档中提取body内容
+  function extractBodyFromHtml(htmlContent: string): string {
+    if (!htmlContent || !htmlContent.trim()) {
+      return ``
+    }
+
+    const parser = new DOMParser()
+    const doc = parser.parseFromString(htmlContent, `text/html`)
+
+    const parseError = doc.querySelector(`parsererror`)
+    if (parseError) {
+      console.warn(`HTML解析错误，尝试直接提取body内容:`, parseError.textContent)
+      const bodyMatch = htmlContent.match(/<body[^>]*>([\s\S]*)<\/body>/i)
+      if (bodyMatch && bodyMatch[1]) {
+        return bodyMatch[1].trim()
+      }
+      return htmlContent
+    }
+
+    const body = doc.body
+    if (!body) {
+      const bodyMatch = htmlContent.match(/<body[^>]*>([\s\S]*)<\/body>/i)
+      if (bodyMatch && bodyMatch[1]) {
+        return bodyMatch[1].trim()
+      }
+      return htmlContent
+    }
+
+    const bodyContent = body.innerHTML
+    if (!bodyContent.trim()) {
+      const bodyMatch = htmlContent.match(/<body[^>]*>([\s\S]*)<\/body>/i)
+      if (bodyMatch && bodyMatch[1]) {
+        return bodyMatch[1].trim()
+      }
+      return htmlContent
+    }
+
+    return bodyContent
+  }
+
   // 渲染内容
   const render = (content: string, options: any) => {
+    const htmlEditorStore = useHtmlEditorStore()
+    const isHtmlMode = htmlEditorStore.isHtmlMode
+
+    if (isHtmlMode) {
+      const bodyContent = extractBodyFromHtml(content)
+
+      if (!bodyContent) {
+        output.value = ``
+        readingTime.chars = 0
+        readingTime.words = 0
+        readingTime.minutes = 0
+        titleList.value = []
+        return output.value
+      }
+
+      const tempDiv = document.createElement(`div`)
+      tempDiv.innerHTML = bodyContent
+      const textContent = tempDiv.textContent || ``
+      const words = textContent.trim().split(/\s+/).filter(word => word.length > 0).length
+      const minutes = Math.ceil(words / 200)
+
+      readingTime.chars = content.length
+      readingTime.words = words
+      readingTime.minutes = minutes
+
+      const headingElements = tempDiv.querySelectorAll(`h1, h2, h3, h4, h5, h6`)
+      titleList.value = []
+      let i = 0
+      for (const item of headingElements) {
+        const clonedItem = item.cloneNode(true) as HTMLElement
+        clonedItem.setAttribute(`id`, `${i}`)
+        titleList.value.push({
+          url: `#${i}`,
+          title: item.textContent || ``,
+          level: Number(item.tagName.slice(1)),
+        })
+        item.setAttribute(`id`, `${i}`)
+        i++
+      }
+
+      output.value = tempDiv.innerHTML
+
+      return output.value
+    }
+
     if (!renderer) {
       throw new Error(`Renderer not initialized. Call initRendererInstance first.`)
     }
@@ -99,7 +185,6 @@ export const useRenderStore = defineStore(`render`, () => {
     const headingTemplate = headingTemplateStore.currentTemplate
     const themeStore = useThemeStore()
 
-    // 重置渲染器配置
     renderer.reset({
       citeStatus: options.isCiteStatus,
       legend: options.legend,
@@ -112,18 +197,14 @@ export const useRenderStore = defineStore(`render`, () => {
       primaryColor: themeStore.primaryColor,
     })
 
-    // 渲染 Markdown
     const { html: baseHtml, readingTime: readingTimeResult } = renderMarkdown(content, renderer)
 
-    // 更新统计信息
     readingTime.chars = content.length
     readingTime.words = readingTimeResult.words
     readingTime.minutes = Math.ceil(readingTimeResult.minutes)
 
-    // 后处理 HTML
     output.value = postProcessHtml(baseHtml, readingTimeResult, renderer)
 
-    // 提取标题
     extractTitles()
 
     return output.value
