@@ -82,6 +82,8 @@ function checkTextSelection() {
   }
 
   const selection = window.getSelection()
+
+  console.log(`selection`, selection)
   if (!selection || selection.rangeCount === 0) {
     if (contextMenuOpen.value) {
       contextMenuOpen.value = false
