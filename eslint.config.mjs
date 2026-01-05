@@ -10,6 +10,7 @@ export default antfu({
     'semi': [`error`, `never`],
     'quotes': [`error`, `backtick`],
     'no-unused-vars': `off`,
+    'unused-imports/no-unused-vars': `off`,
     'no-console': `off`,
     'no-debugger': `off`,
     'ts/no-namespace': `off`,

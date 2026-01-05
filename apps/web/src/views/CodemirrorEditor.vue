@@ -10,7 +10,7 @@ import imageCompression from 'browser-image-compression'
 import { Eye, Pen } from 'lucide-vue-next'
 import { SidebarAIToolbar } from '@/components/ai'
 import AIAssistantSidebar from '@/components/ai/AIAssistantSidebar.vue'
-import { HtmlEditorView, useHtmlEditorStore } from '@/components/editor/html-editor'
+import { HtmlEditorView, HtmlPreviewPanel, useHtmlEditorStore } from '@/components/editor/html-editor'
 
 import {
   ResizableHandle,
@@ -804,6 +804,14 @@ onUnmounted(() => {
                   :class="{ output_night: !backLight }"
                 >
                   <div
+                    v-if="isHtmlMode"
+                    class="preview border-x shadow-xl h-full"
+                    :class="[isMobile ? 'w-[100%]' : previewWidth]"
+                  >
+                    <HtmlPreviewPanel :html-content="htmlContent" />
+                  </div>
+                  <div
+                    v-else
                     class="preview border-x shadow-xl"
                     :class="[isMobile ? 'w-[100%]' : previewWidth]"
                   >
