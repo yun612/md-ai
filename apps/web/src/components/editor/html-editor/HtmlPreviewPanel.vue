@@ -34,7 +34,9 @@ watchEffect(() => {
 })
 
 let mouseUpHandler: ((e: MouseEvent) => void) | null = null
-let selectionChangeHandler: (() => void) | null = null
+let mouseDownHandler: ((e: MouseEvent) => void) | null = null
+let selectionCheckTimer: ReturnType<typeof setTimeout> | null = null
+let isSelecting = false
 
 function setupElementSelection() {
   if (!previewRef.value) {
@@ -44,79 +46,62 @@ function setupElementSelection() {
   if (mouseUpHandler) {
     previewRef.value.removeEventListener(`mouseup`, mouseUpHandler)
   }
-  if (selectionChangeHandler) {
-    document.removeEventListener(`selectionchange`, selectionChangeHandler)
+  if (mouseDownHandler) {
+    previewRef.value.removeEventListener(`mousedown`, mouseDownHandler)
+  }
+
+  if (selectionCheckTimer) {
+    clearTimeout(selectionCheckTimer)
+    selectionCheckTimer = null
+  }
+
+  mouseDownHandler = () => {
+    isSelecting = true
+    if (selectionCheckTimer) {
+      clearTimeout(selectionCheckTimer)
+    }
   }
 
   mouseUpHandler = () => {
-    setTimeout(() => {
+    isSelecting = false
+    if (selectionCheckTimer) {
+      clearTimeout(selectionCheckTimer)
+    }
+    selectionCheckTimer = setTimeout(() => {
       checkTextSelection()
-    }, 10)
+    }, 50)
   }
 
-  selectionChangeHandler = () => {
-    const selection = window.getSelection()
-    const selectedTextContent = selection?.toString().trim() || ``
-
-    if (selectedTextContent.length > 0) {
-      selectedText.value = selectedTextContent
-      try {
-        const range = selection!.getRangeAt(0)
-        const container = range.commonAncestorContainer
-        const element = container.nodeType === Node.TEXT_NODE
-          ? container.parentElement
-          : container as HTMLElement
-
-        if (element && previewRef.value?.contains(element)) {
-          const rect = range.getBoundingClientRect()
-          const menuWidth = 200
-          const menuHeight = 400
-
-          let x = rect.left + rect.width / 2
-          let y = rect.top - menuHeight - 10
-
-          if (x - menuWidth / 2 < 10) {
-            x = menuWidth / 2 + 10
-          }
-          if (x + menuWidth / 2 > window.innerWidth - 10) {
-            x = window.innerWidth - menuWidth / 2 - 10
-          }
-
-          if (y < 10) {
-            y = rect.bottom + 10
-          }
-
-          contextMenuPosition.value = { x, y }
-          selectElement(element)
-          contextMenuOpen.value = true
-        }
-      }
-      catch (e) {
-        console.error(`Error in selectionChangeHandler:`, e)
-      }
-    }
-    else {
-      contextMenuOpen.value = false
-      selectedText.value = ``
-    }
-  }
-
+  previewRef.value.addEventListener(`mousedown`, mouseDownHandler)
   previewRef.value.addEventListener(`mouseup`, mouseUpHandler)
-  document.addEventListener(`selectionchange`, selectionChangeHandler)
 }
 
 function checkTextSelection() {
+  if (isSelecting) {
+    return
+  }
+
   const selection = window.getSelection()
-  if (!selection || selection.toString().trim().length === 0) {
-    contextMenuOpen.value = false
-    selectedText.value = ``
+  if (!selection || selection.rangeCount === 0) {
+    if (contextMenuOpen.value) {
+      contextMenuOpen.value = false
+      selectedText.value = ``
+      clearSelection()
+    }
     return
   }
 
   const selectedTextContent = selection.toString().trim()
   if (selectedTextContent.length === 0) {
-    contextMenuOpen.value = false
-    selectedText.value = ``
+    if (contextMenuOpen.value) {
+      contextMenuOpen.value = false
+      selectedText.value = ``
+      clearSelection()
+    }
+    return
+  }
+
+  if (selectedText.value === selectedTextContent && contextMenuOpen.value) {
     return
   }
 
@@ -131,6 +116,11 @@ function checkTextSelection() {
 
     if (element && previewRef.value?.contains(element)) {
       const rect = range.getBoundingClientRect()
+
+      if (rect.width === 0 && rect.height === 0) {
+        return
+      }
+
       const menuWidth = 200
       const menuHeight = 400
 
@@ -151,6 +141,12 @@ function checkTextSelection() {
       contextMenuPosition.value = { x, y }
       selectElement(element)
       contextMenuOpen.value = true
+    }
+    else {
+      if (contextMenuOpen.value) {
+        contextMenuOpen.value = false
+        clearSelection()
+      }
     }
   }
   catch (e) {
@@ -506,9 +502,12 @@ onMounted(() => {
 
   const closeMenuHandler = (e: MouseEvent) => {
     const target = e.target as HTMLElement
-    if (!target.closest(`.custom-context-menu`) && !target.closest(`#html-output`)) {
-      contextMenuOpen.value = false
-      window.getSelection()?.removeAllRanges()
+    if (!target.closest(`.custom-context-menu`) && !target.closest(`#html-output`) && !target.closest(`.ai-refine-input`)) {
+      const selection = window.getSelection()
+      if (selection && selection.toString().trim().length === 0) {
+        contextMenuOpen.value = false
+        clearSelection()
+      }
     }
   }
 
@@ -523,8 +522,11 @@ onUnmounted(() => {
   if (mouseUpHandler && previewRef.value) {
     previewRef.value.removeEventListener(`mouseup`, mouseUpHandler)
   }
-  if (selectionChangeHandler) {
-    document.removeEventListener(`selectionchange`, selectionChangeHandler)
+  if (mouseDownHandler && previewRef.value) {
+    previewRef.value.removeEventListener(`mousedown`, mouseDownHandler)
+  }
+  if (selectionCheckTimer) {
+    clearTimeout(selectionCheckTimer)
   }
   clearSelection()
 })
