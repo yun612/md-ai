@@ -1,9 +1,10 @@
 <script setup lang="ts">
+import type { ModelConfig, TaskContext } from '@grisaiaevy/crafting-agent'
 import type { ToolFunctionsContext } from './tool-box'
 import type { OutlineData, OutlineItem } from '@/components/OutlineEditor.vue'
 import type { QuickCommandRuntime } from '@/stores/quickCommands'
+import { Agent } from '@grisaiaevy/crafting-agent'
 import { useStorage } from '@vueuse/core'
-
 import DOMPurify from 'isomorphic-dompurify'
 import {
   Bot,
@@ -21,7 +22,10 @@ import {
   Trash2,
 } from 'lucide-vue-next'
 import { marked } from 'marked'
+
+import { nanoid } from 'nanoid'
 import { toast } from 'vue-sonner'
+import { IndexedDBTaskStorage } from '@/agents/indexeddb_storage'
 import AIConfig from '@/components/ai/chat-box/AIConfig.vue'
 import QuickCommandManager from '@/components/ai/chat-box/QuickCommandManager.vue'
 import OutlineEditor from '@/components/OutlineEditor.vue'
@@ -30,9 +34,10 @@ import { Textarea } from '@/components/ui/textarea'
 import useAIConfigStore from '@/stores/aiConfig'
 import { useDisplayStore } from '@/stores/display'
 import { useEditorStore } from '@/stores/editor'
+import { useProjectStore } from '@/stores/project'
 import { useQuickCommands } from '@/stores/quickCommands'
 import { copyPlain } from '@/utils/clipboard'
-import { toolDefinitions, toolFunctions } from './tool-box'
+import { BrowserToolHandler, SimplePromptBuilder } from '../../agents/index'
 
 const editorStore = useEditorStore()
 const { editor } = storeToRefs(editorStore)
@@ -119,6 +124,38 @@ interface ChatMessage {
 const messages = ref<ChatMessage[]>([])
 const AIConfigStore = useAIConfigStore()
 const { apiKey, endpoint, model, temperature, maxToken, type } = storeToRefs(AIConfigStore)
+const projectStore = useProjectStore()
+const { currentProject } = storeToRefs(projectStore)
+
+const tasks = ref<any[]>([])
+const currentTask = ref<any>(null)
+
+async function loadTasks() {
+  if (!currentProject.value?.id)
+    return
+
+  const storage = new IndexedDBTaskStorage()
+  const projectTasks = await storage.getTasksByProjectId(currentProject.value.id)
+  tasks.value = projectTasks
+}
+
+async function loadChatMessages(taskId: string) {
+  const storage = new IndexedDBTaskStorage()
+  const chatMessages = await storage.getChatMessagesByTaskId(taskId)
+
+  messages.value = chatMessages.map((msg: any) => ({
+    role: msg.role,
+    content: msg.content,
+    reasoning: msg.reasoning,
+    done: true,
+  }))
+}
+
+watch(currentTask, async (newTask) => {
+  if (newTask?.id) {
+    await loadChatMessages(newTask.id)
+  }
+})
 
 /* ---------- 快捷指令 ---------- */
 const quickCmdStore = useQuickCommands()
@@ -159,6 +196,11 @@ onMounted(async () => {
   // 编辑器内容会自动保存和加载，不需要保存聊天历史
   messages.value = getDefaultMessages()
   await scrollToBottom(true)
+  await loadTasks()
+})
+
+watch(currentProject, async () => {
+  await loadTasks()
 })
 function getDefaultMessages(): ChatMessage[] {
   return [{ role: `assistant`, content: `你好，我是 AI 助手，有什么可以帮你的？` }]
@@ -582,538 +624,165 @@ function downloadBase64Image(base64: string, filename = `image.png`) {
   }
 }
 
-// 添加工具函数定义
-interface ToolCall {
-  id: string
-  type: `function`
-  function: {
-    name: string
-    arguments: string
-  }
-}
-
 const toolContext: ToolFunctionsContext = {
   jimengConfig,
   saveJimengConfig,
 }
 
-/* ---------- 发送消息 ---------- */
-async function sendMessage() {
-  if (!input.value.trim() || loading.value)
-    return
+let storageInstance: IndexedDBTaskStorage | null = null
 
-  /* 记录历史输入 */
-  inputHistory.value.push(input.value.trim())
-  historyIndex.value = null
+function getTaskStorage(): IndexedDBTaskStorage {
+  if (!storageInstance) {
+    storageInstance = new IndexedDBTaskStorage()
+  }
+  return storageInstance
+}
 
-  loading.value = true
-  const userInput = input.value.trim()
-  messages.value.push({ role: `user`, content: userInput })
-  input.value = ``
+function getModelConfig(): ModelConfig {
+  const providerMap: Record<string, NonNullable<ModelConfig[`agentModel`]>[`provider`]> = {
+    doubao: `doubao`,
+    google: `google`,
+    minimax: `minimax`,
+    openrouter: `openrouter`,
+  }
 
-  const replyMessage: ChatMessage = { role: `assistant`, content: ``, reasoning: ``, done: false }
-  messages.value.push(replyMessage)
-  const replyMessageProxy = messages.value[messages.value.length - 1]
-  await scrollToBottom(true)
+  return {
+    agentModel: {
+      provider: providerMap[type.value] || `openrouter`,
+      apiKey: apiKey.value,
+      baseUrl: endpoint.value,
+      modelName: model.value,
+      maxTokens: maxToken.value,
+    },
+  }
+}
 
-  /* 组装上下文 */
-  const allHistory = messages.value
-    .slice(-12)
-    .filter((msg, idx, arr) =>
-      !(idx === arr.length - 1 && msg.role === `assistant` && !msg.done)
-      && !(idx === 0 && msg.role === `assistant`),
-    )
+async function startTaskWithStreaming(
+  userInstruction: string,
+  onChunk: (chunk: any) => void,
+) {
+  const taskStorage = getTaskStorage()
 
-  let contextHistory: ChatMessage[]
-  if (isQuoteAllContent.value) {
-    const latest: ChatMessage[] = []
-    for (let i = allHistory.length - 1; i >= 0 && latest.length < 2; i--) {
-      const m = allHistory[i]
-      if (latest.length === 0 || m.role === `user`)
-        latest.unshift(m)
-      else if (m.role === `assistant`)
-        latest.unshift(m)
-    }
-    contextHistory = latest
+  let taskId: string
+  if (currentTask.value?.id) {
+    taskId = currentTask.value.id
   }
   else {
-    contextHistory = allHistory.slice(-10)
+    taskId = nanoid()
+    currentTask.value = { id: taskId, title: userInstruction.substring(0, 50) }
   }
-  const quoteMessages: ChatMessage[] = isQuoteAllContent.value
-    ? [{
-        role: `system`,
-        content:
-          `下面是一篇 Markdown 文章全文，请严格以此为主完成后续指令：\n\n${editor.value?.state.doc.toString()}`,
-      }]
-    : []
 
-  const payloadMessages: ChatMessage[] = [
-    {
-      role: `system`,
-      content: `你是一个专业的 Markdown 编辑器助手，请用简洁中文回答。
+  const projectId = currentProject.value?.id || ``
 
-**图片生成规则（必须严格遵守）：**
-1. 当用户提到以下任何关键词时，**必须立即调用 image_generate 工具**：
-   - 生成图片、创建图片、画图、设计图片、制作图片
-   - 图片、图像、图、画
-   - 任何包含"图片"、"图像"、"画"的请求
-   
-2. **禁止行为**：
-   - 不要回复"我无法生成图片"、"我不会生成图片"等
-   - 不要只回复文字而不调用工具
-   - 不要询问用户是否需要生成图片，直接调用工具
-   
-3. **必须行为**：
-   - 检测到图片生成需求时，立即调用 image_generate 工具
-   - 将用户的完整描述作为 prompt 参数传递给工具
-   - 等待工具返回结果后再回复用户`,
+  const modelConfig = getModelConfig()
+
+  const taskContext: TaskContext = {
+    modelConfig,
+    variables: {
     },
-    ...quoteMessages,
-    ...contextHistory,
-  ]
-
-  // 循环处理多轮对话（用于处理 tool calls）
-  let continueConversation = true
-  let conversationRound = 0
-  const maxRounds = 5
-  // 标记是否调用了大纲生成工具（用于在下一轮回复中解析大纲数据）
-  let hasOutlineToolCall = false
-
-  while (continueConversation && conversationRound < maxRounds) {
-    conversationRound++
-
-    const payload = {
-      model: model.value,
-      messages: payloadMessages,
-      tools: toolDefinitions,
-
-      // 新增tool
-      tool_choice: `auto`,
-      temperature: temperature.value,
-      max_tokens: maxToken.value,
-      stream: true,
-    }
-
-    const headers: Record<string, string> = { 'Content-Type': `application/json` }
-    if (apiKey.value && type.value !== `default`)
-      headers.Authorization = `Bearer ${apiKey.value}`
-
-    fetchController.value = new AbortController()
-    const signal = fetchController.value.signal
-
-    try {
-      const url = new URL(endpoint.value)
-
-      // 智能处理端点路径
-      // 如果路径已经包含 /chat/completions，直接使用
-      // 如果路径以 /v3 或 /v1 结尾，追加 /chat/completions
-      // 否则替换最后一个路径段
-      if (url.pathname.endsWith(`/chat/completions`)) {
-        // 已经包含完整路径，不做处理
-      }
-      else if (url.pathname.match(/\/v\d+$/)) {
-        // 路径以 /v1 或 /v3 结尾，追加 /chat/completions
-        url.pathname = url.pathname.replace(/\/?$/, `/chat/completions`)
-      }
-      else if (url.pathname === `/` || url.pathname === ``) {
-        // 根路径，添加 /chat/completions
-        url.pathname = `/chat/completions`
-      }
-      else {
-        // 其他情况，替换最后一个路径段或追加
-        url.pathname = url.pathname.replace(/\/?$/, `/chat/completions`)
-      }
-
-      console.log(`[请求] URL:`, url.toString())
-      console.log(`[请求] 工具数量:`, payload.tools?.length || 0)
-      if (payload.tools && payload.tools.length > 0) {
-        console.log(`[请求] 可用工具:`, payload.tools.map((t: any) => t.function?.name).filter(Boolean))
-      }
-      console.log(`[请求] payload:`, JSON.stringify(payload, null, 2))
-
-      const res = await window.fetch(url.toString(), {
-        method: `POST`,
-        headers,
-        body: JSON.stringify(payload),
-        signal,
-      })
-
-      if (!res.ok || !res.body) {
-        const errorText = await res.text().catch(() => ``)
-        console.error(`请求失败详情:`, {
-          status: res.status,
-          statusText: res.statusText,
-          url: url.toString(),
-          errorText,
-        })
-        throw new Error(`响应错误：${res.status} ${res.statusText}${errorText ? ` - ${errorText}` : ``}`)
-      }
-
-      const reader = res.body.getReader()
-      const decoder = new TextDecoder(`utf-8`)
-      let buffer = ``
-
-      // 用于收集 tool calls
-      const toolCallBuffer: Record<number, ToolCall> = {}
-
-      while (true) {
-        const { value, done } = await reader.read()
-        if (done) {
-          const last = messages.value[messages.value.length - 1]
-          if (last.role === `assistant`) {
-            last.done = true
-
-            // 如果调用了大纲生成工具，尝试从回复中解析大纲数据
-            if (hasOutlineToolCall && last.content) {
-              parseOutlineFromContent(last.content)
-            }
-          }
-          break
-        }
-
-        buffer += decoder.decode(value, { stream: true })
-        const lines = buffer.split(`\n`)
-        buffer = lines.pop() || ``
-
-        for (const line of lines) {
-          if (!line.trim() || line.trim() === `data: [DONE]`)
-            continue
-          try {
-            const json = JSON.parse(line.replace(/^data: /, ``))
-            const delta = json.choices?.[0]?.delta || {}
-            const finishReason = json.choices?.[0]?.finish_reason
-
-            // 记录 finish_reason，帮助诊断工具调用问题
-            if (finishReason) {
-              console.log(`[响应] finish_reason:`, finishReason)
-              if (finishReason === `length`) {
-                console.warn(`[响应] 响应因长度限制而结束，可能没有完成工具调用`)
-              }
-              else if (finishReason === `tool_calls`) {
-                console.log(`[响应] 检测到工具调用完成`)
-              }
-            }
-
-            const last = messages.value[messages.value.length - 1]
-
-            // 第二轮及以后的对话，更新最后一条消息
-            if (last !== replyMessageProxy && conversationRound > 1) {
-              if (delta.content)
-                last.content = (last.content || ``) + delta.content
-              await scrollToBottom()
-              continue
-            }
-
-            // 处理内容
-            if (delta.content) {
-              last.content = (last.content || ``) + delta.content
-              await scrollToBottom()
-            }
-            else if (delta.reasoning_content) {
-              last.reasoning = (last.reasoning || ``) + delta.reasoning_content
-              await scrollToBottom()
-            }
-
-            // 处理 tool calls - 收集完整的工具调用信息
-            if (delta.tool_calls) {
-              console.log(`[工具调用] 检测到 tool_calls delta:`, delta.tool_calls)
-              for (const toolCallDelta of delta.tool_calls) {
-                // 检查是否调用了大纲生成工具
-                if (toolCallDelta.function?.name === `generate_article_outline`) {
-                  hasOutlineToolCall = true
-                }
-                const index = toolCallDelta.index
-                if (!toolCallBuffer[index]) {
-                  toolCallBuffer[index] = {
-                    id: toolCallDelta.id || ``,
-                    type: toolCallDelta.type || `function`,
-                    function: {
-                      name: ``,
-                      arguments: ``,
-                    },
-                  }
-                  console.log(`[工具调用] 创建新的工具调用缓冲区 [${index}]:`, toolCallDelta)
-                }
-
-                if (toolCallDelta.id)
-                  toolCallBuffer[index].id = toolCallDelta.id
-                if (toolCallDelta.function?.name) {
-                  toolCallBuffer[index].function.name += toolCallDelta.function.name
-                  console.log(`[工具调用] 工具名称 [${index}]:`, toolCallDelta.function.name)
-                }
-                if (toolCallDelta.function?.arguments) {
-                  toolCallBuffer[index].function.arguments += toolCallDelta.function.arguments
-                  console.log(`[工具调用] 工具参数片段 [${index}]:`, toolCallDelta.function.arguments.substring(0, 100))
-                }
-              }
-            }
-          }
-          catch (e) {
-            console.error(`解析失败:`, e)
-          }
-        }
-      }
-
-      // 检查是否有 tool calls 需要执行
-      const completedToolCalls = Object.values(toolCallBuffer).filter(
-        tc => tc.function.name && tc.function.arguments !== undefined && tc.function.arguments.length > 0,
-      ) as ToolCall[]
-
-      // 如果没有工具调用，检查用户消息是否应该触发图片生成
-      if (completedToolCalls.length === 0) {
-        const lastUserMessage = [...payloadMessages].reverse().find(m => m.role === `user`)
-        if (lastUserMessage) {
-          const userContent = lastUserMessage.content || ``
-          const imageKeywords = [`图片`, `图像`, `图`, `画`, `生成图片`, `创建图片`, `画图`, `设计图片`, `制作图片`]
-          const shouldTriggerImage = imageKeywords.some(keyword => userContent.includes(keyword))
-
-          if (shouldTriggerImage) {
-            console.warn(`[工具调用] 用户消息包含图片相关关键词，但AI没有调用工具`)
-            console.warn(`[工具调用] 用户消息:`, userContent)
-            console.warn(`[工具调用] 工具缓冲区:`, toolCallBuffer)
-            console.warn(`[工具调用] 这可能是因为：1) AI模型选择不调用工具 2) 响应被截断 3) 工具调用格式错误`)
-          }
-        }
-      }
-
-      if (completedToolCalls.length > 0) {
-        console.log(`[工具调用] 检测到 tool calls:`, completedToolCalls)
-        console.log(`[工具调用] 工具数量:`, completedToolCalls.length)
-
-        const last = messages.value[messages.value.length - 1]
-
-        // 执行工具函数
-        const toolResults = []
-        for (const toolCall of completedToolCalls) {
-          try {
-            const args = JSON.parse(toolCall.function.arguments)
-            console.log(`[工具执行] 开始执行工具: ${toolCall.function.name}`, args)
-
-            // 如果是图片生成工具，显示执行状态
-            if (toolCall.function.name === `image_generate`) {
-              last.content = `正在生成图片，请稍候...`
-              await scrollToBottom()
-            }
-
-            // 如果调用的是大纲生成工具，设置标记
-            if (toolCall.function.name === `generate_article_outline`) {
-              hasOutlineToolCall = true
-            }
-
-            const toolFn = toolFunctions[toolCall.function.name]
-
-            if (!toolFn) {
-              toolResults.push({
-                tool_call_id: toolCall.id,
-                role: `tool`,
-                content: JSON.stringify({ error: `工具 ${toolCall.function.name} 不存在` }),
-              })
-              continue
-            }
-
-            // 执行工具函数，获取 JSON 数据
-            const result = await Promise.resolve(toolFn(args, toolContext))
-            console.log(`工具返回的 JSON 数据:`, result)
-
-            // 如果是搜索工具，保存搜索结果到消息中（默认不展开）
-            if (toolCall.function.name === `search_web` && result.results && Array.isArray(result.results)) {
-              last.searchResults = result.results.map((item: any) => ({
-                title: item.title || ``,
-                url: item.url || ``,
-                snippet: item.snippet || item.description || ``,
-                content: item.content || ``,
-              }))
-              last.showSearchResults = false // 默认不展开搜索结果
-            }
-
-            // 如果是图片工具，保存图片结果到消息中
-            if ((toolCall.function.name === `image_generate`
-              || toolCall.function.name === `image_remove_background`
-              || toolCall.function.name === `image_variation`)) {
-              console.log(`[工具处理] ${toolCall.function.name} 返回结果:`, JSON.stringify(result, null, 2))
-
-              // 检查是否有错误
-              if (result.error) {
-                console.error(`[工具] ${toolCall.function.name} 执行失败:`, result.error)
-                last.content = `图片生成失败: ${result.error}`
-                last.done = true
-              }
-              // 检查是否有图片结果
-              else if (result.images && Array.isArray(result.images) && result.images.length > 0) {
-                console.log(`[工具] ${toolCall.function.name} 成功，共 ${result.images.length} 张图片`)
-                console.log(`工具] 图片数据详情:`, result.images.map((img: any, idx: number) => ({
-                  index: idx,
-                  hasUrl: !!img.url,
-                  hasBase64: !!img.base64,
-                  base64Length: img.base64?.length || 0,
-                  base64Preview: `${img.base64?.substring(0, 50)}...` || `N/A`,
-                  prompt: img.prompt,
-                })))
-
-                // 存储图片结果
-                last.imageResults = result.images.map((it: any) => ({
-                  url: it.url,
-                  base64: it.base64,
-                  prompt: it.prompt,
-                  op: it.op,
-                  meta: it.meta,
-                }))
-                console.log(`[工具] 图片结果已存储到 last.imageResults，共 ${last.imageResults?.length || 0} 张`)
-
-                // 生成Markdown格式的图片显示
-                const imageMarkdown = result.images.map((it: any, idx: number) => {
-                  // 确保 alt 文本是安全的字符串，移除可能导致问题的特殊字符
-                  const safeAlt = (it.prompt || `生成的图片 ${idx + 1}`)
-                    .toString()
-                    .replace(/[[\]()]/g, ``) // 移除 Markdown 特殊字符
-                    .replace(/\n/g, ` `) // 替换换行符
-                    .trim() || `图片 ${idx + 1}`
-
-                  if (it.url) {
-                    return `![${safeAlt}](${it.url})`
-                  }
-                  else if (it.base64) {
-                    // 根据base64前缀判断图片格式
-                    let mimeType = `image/jpeg` // 默认JPEG
-                    if (it.base64.startsWith(`/9j/`)) {
-                      // JPEG格式 (FF D8 FF)
-                      mimeType = `image/jpeg`
-                    }
-                    else if (it.base64.startsWith(`iVBORw0KGgo`)) {
-                      // PNG格式 (89 50 4E 47)
-                      mimeType = `image/png`
-                    }
-                    else if (it.base64.startsWith(`R0lGODlh`) || it.base64.startsWith(`R0lGODdh`)) {
-                      // GIF格式 (47 49 46 38)
-                      mimeType = `image/gif`
-                    }
-                    else if (it.base64.startsWith(`UklGR`)) {
-                      // WebP格式
-                      mimeType = `image/webp`
-                    }
-                    return `![${safeAlt}](data:${mimeType};base64,${it.base64})`
-                  }
-                  return ``
-                }).filter(Boolean).join(`\n\n`)
-
-                // 设置消息内容，包含Markdown格式的图片
-                last.content = `图片生成成功！共生成 ${result.images.length} 张图片\n\n${imageMarkdown}`
-                last.done = true
-                console.log(`[工具] 图片结果已添加到消息:`, last.imageResults)
-                console.log(`[工具] 图片Markdown内容:`, imageMarkdown)
-              }
-              else {
-                console.warn(`[工具] ${toolCall.function.name} 返回数据格式异常:`, result)
-                last.content = `图片生成返回数据格式异常: ${JSON.stringify(result, null, 2)}`
-                last.done = true
-              }
-            }
-
-            // 如果是文章大纲生成工具，标记已调用（等待 AI 在下一轮回复中返回大纲数据）
-            else if (toolCall.function.name === `generate_article_outline`) {
-              // 工具函数返回的是提示信息，不包含实际大纲数据
-              // 大纲数据会在 AI 的下一轮回复中返回
-              // 我们会在回复完成后通过 parseOutlineFromContent 函数解析
-              last.content = `正在生成文章大纲，请稍候...`
-            }
-            // 如果是搜索工具，只显示简短提示，不显示完整 JSON 数据
-            else if (toolCall.function.name === `search_web`) {
-              if (result.error) {
-                last.content = `搜索失败: ${result.error}`
-              }
-              else {
-                const resultCount = result.results?.length || 0
-                last.content = `已搜索"${args.query}"，找到 ${resultCount} 条结果`
-              }
-            }
-            else {
-              // 其他工具正常显示调用信息和结果
-              if (result.error) {
-                last.content = `工具执行失败: ${result.error}`
-              }
-              else {
-                last.content = `[调用工具: ${toolCall.function.name}(${JSON.stringify(args)})]\n返回数据: ${JSON.stringify(result, null, 2)}`
-              }
-            }
-
-            // 将 JSON 结果添加到工具结果中
-            toolResults.push({
-              tool_call_id: toolCall.id,
-              role: `tool`,
-              content: JSON.stringify(result), // 重要：必须是 JSON 字符串
-            })
-
-            await scrollToBottom()
-          }
-          catch (e) {
-            console.error(`工具执行失败:`, e)
-            toolResults.push({
-              tool_call_id: toolCall.id,
-              role: `tool`,
-              content: JSON.stringify({ error: `工具执行失败: ${(e as Error).message}` }),
-            })
-          }
-        }
-
-        // 将工具结果添加到消息历史，并准备下一轮请求
-        payloadMessages.push({
-          role: `assistant`,
-          content: last.content || null,
-          tool_calls: completedToolCalls,
-        } as any)
-
-        // 添加工具返回的 JSON 数据
-        for (const result of toolResults) {
-          payloadMessages.push(result as any)
-        }
-
-        // 创建新的 assistant 消息用于接收最终回复
-        const nextReplyMessage: ChatMessage = { role: `assistant`, content: ``, reasoning: ``, done: false }
-        messages.value.push(nextReplyMessage)
-        continueConversation = true
-        await scrollToBottom(true)
-      }
-      else {
-        // 没有 tool calls，结束对话
-        continueConversation = false
-      }
-    }
-    catch (e) {
-      if ((e as Error).name === `AbortError`) {
-        console.log(`请求中止`)
-        continueConversation = false
-      }
-      else {
-        console.error(`请求失败:`, e)
-        messages.value[messages.value.length - 1].content
-          = `请求失败: ${(e as Error).message}`
-        continueConversation = false
-      }
-      await scrollToBottom(true)
-    }
+    systemPromptBuilder: new SimplePromptBuilder(),
+    tools: [
+      new BrowserToolHandler(),
+    ],
   }
 
-  // 结束处理 - 不保存聊天历史，只保留默认欢迎消息
-  // 编辑器内容会自动保存，不需要保存聊天历史
-  // 如果需要，可以清空历史记录
+  const agent = new Agent(
+    taskId,
+    projectId,
+    modelConfig,
+    taskStorage,
+    taskContext,
+  )
+
+  console.log(`[Task] Starting task:`, {
+    modelConfig,
+    taskId,
+    projectId,
+    instruction: userInstruction,
+  })
+
   try {
-    // 只保存默认欢迎消息，不保存聊天历史
-    const defaultMessages = getDefaultMessages()
-    localStorage.setItem(memoryKey, JSON.stringify(defaultMessages))
+    const stream = agent.startTask(userInstruction)
+
+    for await (const chunk of stream) {
+      onChunk(chunk)
+    }
+
+    console.log(`[Task] Task completed successfully`)
+    return {
+      success: true,
+      taskId,
+      storage: taskStorage,
+    }
   }
   catch (error) {
-    // 如果保存失败，尝试清空历史记录
-    try {
-      localStorage.removeItem(memoryKey)
-    }
-    catch (e2) {
-      console.error(`[存储] 清空历史记录失败:`, e2)
-    }
-    console.error(`[存储] 保存消息失败:`, error)
+    console.error(`[Task] Task failed:`, error)
+    throw error
+  }
+}
+
+async function sendMessage() {
+  const userMessage = input.value.trim()
+  if (!userMessage)
+    return
+
+  input.value = ``
+  historyIndex.value = null
+
+  if (!inputHistory.value.includes(userMessage)) {
+    inputHistory.value.push(userMessage)
   }
 
-  loading.value = false
-  fetchController.value = null
+  messages.value.push({
+    role: `user`,
+    content: userMessage,
+    done: true,
+  })
+
+  messages.value.push({
+    role: `assistant`,
+    content: ``,
+    done: false,
+  })
+
+  loading.value = true
+  fetchController.value = new AbortController()
+
+  try {
+    await startTaskWithStreaming(userMessage, (chunk) => {
+      const lastMessage = messages.value[messages.value.length - 1]
+      if (lastMessage?.role === `assistant`) {
+        if (chunk.content) {
+          lastMessage.content += chunk.content
+        }
+        if (chunk.reasoning) {
+          lastMessage.reasoning = chunk.reasoning
+        }
+        if (chunk.done !== undefined) {
+          lastMessage.done = chunk.done
+        }
+        scrollToBottom()
+      }
+    })
+
+    const lastMessage = messages.value[messages.value.length - 1]
+    if (lastMessage?.role === `assistant`) {
+      lastMessage.done = true
+    }
+  }
+  catch (error) {
+    console.error(`[sendMessage] Error:`, error)
+    const lastMessage = messages.value[messages.value.length - 1]
+    if (lastMessage?.role === `assistant`) {
+      lastMessage.content = `抱歉，发生了错误：${error instanceof Error ? error.message : String(error)}`
+      lastMessage.done = true
+    }
+    toast.error(`发送消息失败`)
+  }
+  finally {
+    loading.value = false
+    fetchController.value = null
+  }
 }
 </script>
 
@@ -1190,6 +859,29 @@ async function sendMessage() {
         </Button>
       </div>
       <QuickCommandManager v-model:open="cmdMgrOpen" />
+    </div>
+
+    <!-- 历史任务列表 -->
+    <div
+      v-if="!configVisible && !outlineVisible && tasks.length > 0"
+      class="ai-sidebar-tasks border-b bg-muted/20 px-3 py-2"
+    >
+      <div class="text-xs font-medium text-muted-foreground mb-2">
+        历史任务
+      </div>
+      <div class="space-y-1">
+        <Button
+          v-for="task in tasks"
+          :key="task.id"
+          variant="ghost"
+          size="sm"
+          class="w-full justify-start h-7 px-2 text-xs"
+          :class="{ 'bg-primary/10': currentTask?.id === task.id }"
+          @click="currentTask = task"
+        >
+          <span class="truncate">{{ task.title || task.description || '未命名任务' }}</span>
+        </Button>
+      </div>
     </div>
 
     <!-- 配置面板 -->

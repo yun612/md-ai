@@ -5,103 +5,198 @@ import {
   DEFAULT_SERVICE_TEMPERATURE,
   DEFAULT_SERVICE_TYPE,
 } from '@md/shared/constants'
+import { IndexedDBTaskStorage } from '../agents/indexeddb_storage'
 
-/**
- * AI 配置 Store
- * 负责管理 AI 服务的配置，包括服务类型、模型、温度等参数
- */
+const AI_CONFIG_CATEGORY = `llm`
+
+interface ServiceConfig {
+  type: string
+  temperature: number
+  maxToken: number
+  apiKey: string
+  model: string
+  endpoint: string
+}
+
+let storageInstance: IndexedDBTaskStorage | null = null
+
+function getStorage(): IndexedDBTaskStorage {
+  if (!storageInstance) {
+    storageInstance = new IndexedDBTaskStorage()
+  }
+  return storageInstance
+}
+
+async function getServiceConfig(serviceType: string): Promise<ServiceConfig | null> {
+  const storage = getStorage()
+  const config = await storage.getConfigByKey(serviceType, AI_CONFIG_CATEGORY)
+  if (config?.val) {
+    try {
+      return JSON.parse(config.val)
+    }
+    catch (e) {
+      console.error(`Failed to parse config for ${serviceType}:`, e)
+      return null
+    }
+  }
+  return null
+}
+
+async function setServiceConfig(serviceType: string, config: ServiceConfig): Promise<void> {
+  const storage = getStorage()
+  const existing = await storage.getConfigByKey(serviceType, AI_CONFIG_CATEGORY)
+
+  const configData = {
+    category: AI_CONFIG_CATEGORY,
+    key: serviceType,
+    val: JSON.stringify(config),
+    id: existing?.id || `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+  }
+
+  if (existing) {
+    await storage.createConfig(configData)
+  }
+  else {
+    await storage.createConfig(configData)
+  }
+}
+
 export const useAIConfigStore = defineStore(`AIConfig`, () => {
-  // ==================== 全局配置 ====================
-
-  // 服务类型
-  const type = useStorage<string>(`openai_type`, DEFAULT_SERVICE_TYPE)
-
-  // 温度参数（0-2，控制随机性）
-  const temperature = useStorage<number>(`openai_temperature`, DEFAULT_SERVICE_TEMPERATURE)
-
-  // 最大 token 数
-  const maxToken = useStorage<number>(`openai_max_token`, DEFAULT_SERVICE_MAX_TOKEN)
-
-  // ==================== 服务相关字段 ====================
-
-  // 服务端点（由 watch(type) 自动初始化）
+  const type = ref<string>(DEFAULT_SERVICE_TYPE)
+  const temperature = ref<number>(DEFAULT_SERVICE_TEMPERATURE)
+  const maxToken = ref<number>(DEFAULT_SERVICE_MAX_TOKEN)
   const endpoint = ref<string>(``)
-
-  // 模型名称（由 watch(type) 自动初始化）
   const model = ref<string>(``)
+  const apiKey = ref<string>(DEFAULT_SERVICE_KEY)
 
-  // ==================== API Key 管理 ====================
+  const isLoaded = ref(false)
 
-  // API Key（按服务类型分别持久化到 localStorage）
-  const apiKey = customRef<string>((track, trigger) => ({
-    get() {
-      track()
-      return localStorage.getItem(`openai_key_${type.value}`) || DEFAULT_SERVICE_KEY
-    },
-    set(val: string) {
-      if (type.value !== DEFAULT_SERVICE_TYPE) {
-        localStorage.setItem(`openai_key_${type.value}`, val)
+  async function loadConfig() {
+    const storage = getStorage()
+    const globalConfig = await storage.getConfigByKey(`global`, AI_CONFIG_CATEGORY)
+
+    if (globalConfig?.val) {
+      try {
+        const parsed = JSON.parse(globalConfig.val)
+        type.value = parsed.type || DEFAULT_SERVICE_TYPE
       }
-      trigger()
-    },
-  }))
+      catch (e) {
+        type.value = DEFAULT_SERVICE_TYPE
+      }
+    }
 
-  // ==================== 响应式逻辑 ====================
+    await syncServiceConfig(type.value)
+    isLoaded.value = true
+  }
 
-  // 监听服务类型变化，自动同步端点和模型
-  watch(
-    type,
-    (newType) => {
-      const svc = serviceOptions.find(s => s.value === newType) ?? serviceOptions[0]
+  async function syncServiceConfig(serviceType: string) {
+    const svc = serviceOptions.find(s => s.value === serviceType) ?? serviceOptions[0]
+    endpoint.value = svc.endpoint
 
-      // 更新服务端点
-      endpoint.value = svc.endpoint
+    const savedConfig = await getServiceConfig(serviceType)
 
-      // 读取已保存的模型，如果不存在或不在列表中，则使用默认模型
-      const saved = localStorage.getItem(`openai_model_${newType}`) || ``
-      model.value = svc.models.includes(saved) ? saved : svc.models[0]
+    if (savedConfig) {
+      temperature.value = savedConfig.temperature ?? DEFAULT_SERVICE_TEMPERATURE
+      maxToken.value = savedConfig.maxToken ?? DEFAULT_SERVICE_MAX_TOKEN
+      model.value = svc.models.includes(savedConfig.model) ? savedConfig.model : svc.models[0]
+      apiKey.value = savedConfig.apiKey || DEFAULT_SERVICE_KEY
+    }
+    else {
+      temperature.value = DEFAULT_SERVICE_TEMPERATURE
+      maxToken.value = DEFAULT_SERVICE_MAX_TOKEN
+      model.value = svc.models[0]
+      apiKey.value = DEFAULT_SERVICE_KEY
+    }
+  }
 
-      // 保存当前模型到 localStorage
-      localStorage.setItem(`openai_model_${newType}`, model.value)
-    },
-    { immediate: true }, // 首次加载时也执行
-  )
+  async function saveCurrentConfig() {
+    if (!isLoaded.value)
+      return
 
-  // 监听模型变化，持久化到 localStorage
-  watch(model, (val) => {
-    localStorage.setItem(`openai_model_${type.value}`, val)
+    const config: ServiceConfig = {
+      type: type.value,
+      temperature: temperature.value,
+      maxToken: maxToken.value,
+      apiKey: apiKey.value,
+      model: model.value,
+      endpoint: endpoint.value,
+    }
+
+    await setServiceConfig(type.value, config)
+  }
+
+  async function saveGlobalConfig() {
+    const storage = getStorage()
+    const existing = await storage.getConfigByKey(`global`, AI_CONFIG_CATEGORY)
+
+    const globalData = {
+      category: AI_CONFIG_CATEGORY,
+      key: `global`,
+      val: JSON.stringify({ type: type.value }),
+      id: existing?.id || `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+    }
+
+    if (existing) {
+      await storage.createConfig(globalData)
+    }
+    else {
+      await storage.createConfig(globalData)
+    }
+  }
+
+  watch(type, async (newType) => {
+    await saveGlobalConfig()
+    await syncServiceConfig(newType)
   })
 
-  // ==================== Actions ====================
+  watch([temperature, maxToken, model, apiKey], async () => {
+    await saveCurrentConfig()
+  }, { deep: true })
 
-  /**
-   * 重置所有配置到默认值
-   */
-  const reset = () => {
+  const reset = async () => {
     type.value = DEFAULT_SERVICE_TYPE
     temperature.value = DEFAULT_SERVICE_TEMPERATURE
     maxToken.value = DEFAULT_SERVICE_MAX_TOKEN
 
-    // 清理所有服务相关的持久化数据
-    serviceOptions.forEach(({ value }) => {
-      localStorage.removeItem(`openai_key_${value}`)
-      localStorage.removeItem(`openai_model_${value}`)
-    })
+    const storage = getStorage()
+    for (const service of serviceOptions) {
+      const existing = await storage.getConfigByKey(service.value, AI_CONFIG_CATEGORY)
+
+      if (existing) {
+        const defaultConfig: ServiceConfig = {
+          type: service.value,
+          temperature: DEFAULT_SERVICE_TEMPERATURE,
+          maxToken: DEFAULT_SERVICE_MAX_TOKEN,
+          apiKey: DEFAULT_SERVICE_KEY,
+          model: service.models[0],
+          endpoint: service.endpoint,
+        }
+
+        await storage.createConfig({
+          id: existing.id,
+          category: AI_CONFIG_CATEGORY,
+          key: service.value,
+          val: JSON.stringify(defaultConfig),
+        })
+      }
+    }
+
+    await saveGlobalConfig()
   }
 
+  loadConfig()
+
   return {
-    // State
     type,
     endpoint,
     model,
     temperature,
     maxToken,
     apiKey,
-
-    // Actions
+    isLoaded,
     reset,
+    loadConfig,
   }
 })
 
-// 默认导出（向后兼容）
 export default useAIConfigStore
