@@ -32,7 +32,6 @@
     "@aws-sdk/client-s3": "^3.919.0",
     "@aws-sdk/s3-request-presigner": "^3.919.0",
     "@codemirror/lang-html": "^6.4.11",
-    "@crafting-agent/shared": "workspace:*",
     "@exercism/highlightjs-gdscript": "^0.0.1",
     "@md/core": "workspace:*",
     "@md/shared": "workspace:*",

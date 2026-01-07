@@ -41,6 +41,9 @@ importers:
       archiver:
         specifier: ^7.0.1
         version: 7.0.1
+      baseline-browser-mapping:
+        specifier: ^2.9.11
+        version: 2.9.11
       cross-env:
         specifier: ^10.1.0
         version: 10.1.0
@@ -110,6 +113,9 @@ importers:
       "@aws-sdk/s3-request-presigner":
         specifier: ^3.919.0
         version: 3.919.0
+      "@codemirror/lang-html":
+        specifier: ^6.4.11
+        version: 6.4.11
       "@exercism/highlightjs-gdscript":
         specifier: ^0.0.1
         version: 0.0.1
@@ -6315,17 +6321,10 @@ packages:
         integrity: sha512-AKpaYlHn8t4SVbOHCy+b5+KKgvR4vrsD8vbvrbiQJps7fKDTkjkDry6ji0rUJjC0kzbNePLwzxq8iypo41qeWA==,
       }
 
-  baseline-browser-mapping@2.8.16:
+  baseline-browser-mapping@2.9.11:
     resolution:
       {
-        integrity: sha512-OMu3BGQ4E7P1ErFsIPpbJh0qvDudM/UuJeHgkAvfWe+0HFJCXh+t/l8L6fVLR55RI/UbKrVLnAXZSVwd9ysWYw==,
-      }
-    hasBin: true
-
-  baseline-browser-mapping@2.8.20:
-    resolution:
-      {
-        integrity: sha512-JMWsdF+O8Orq3EMukbUN1QfbLK9mX2CkUmQBcW2T0s8OmdAUL5LLM/6wFwSrqXzlXB13yhyK9gTKS1rIizOduQ==,
+        integrity: sha512-Sg0xJUNDU1sJNGdfGWhVHX0kkZ+HWcvmVymJbj6NSgZZmW/8S9Y2HQ5euytnIgakgxN6papOAWiwDo1ctFDcoQ==,
       }
     hasBin: true
 
@@ -20938,9 +20937,7 @@ snapshots:
 
   base64-js@1.5.1: {}
 
-  baseline-browser-mapping@2.8.16: {}
-
-  baseline-browser-mapping@2.8.20: {}
+  baseline-browser-mapping@2.9.11: {}
 
   bidi-js@1.0.3:
     dependencies:
@@ -21088,7 +21085,7 @@ snapshots:
 
   browserslist@4.26.3:
     dependencies:
-      baseline-browser-mapping: 2.8.16
+      baseline-browser-mapping: 2.9.11
       caniuse-lite: 1.0.30001750
       electron-to-chromium: 1.5.237
       node-releases: 2.0.23
@@ -21096,7 +21093,7 @@ snapshots:
 
   browserslist@4.27.0:
     dependencies:
-      baseline-browser-mapping: 2.8.20
+      baseline-browser-mapping: 2.9.11
       caniuse-lite: 1.0.30001751
       electron-to-chromium: 1.5.241
       node-releases: 2.0.26

@@ -808,7 +808,9 @@ onUnmounted(() => {
                     class="preview border-x shadow-xl h-full"
                     :class="[isMobile ? 'w-[100%]' : previewWidth]"
                   >
-                    <HtmlPreviewPanel :html-content="htmlContent" />
+                    <section id="output" class="w-full">
+                      <HtmlPreviewPanel :html-content="htmlContent" />
+                    </section>
                   </div>
                   <div
                     v-else

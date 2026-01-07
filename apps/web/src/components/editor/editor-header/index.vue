@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Bot, ChevronDownIcon, Menu, Palette, SlidersHorizontal } from 'lucide-vue-next'
-import { HtmlEditorToolbar } from '@/components/editor/html-editor'
+import { HtmlEditorToolbar, useHtmlEditorStore } from '@/components/editor/html-editor'
+import { usePreviewStyleStore } from '@/components/editor/html-editor/usePreviewStyleStore'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useAIConfigStore } from '@/stores/aiConfig'
 import { useDisplayStore } from '@/stores/display'
@@ -21,12 +22,15 @@ const uiStore = useUIStore()
 const exportStore = useExportStore()
 const displayStore = useDisplayStore()
 const aiConfigStore = useAIConfigStore()
+const htmlEditorStore = useHtmlEditorStore()
+const previewStyleStore = usePreviewStyleStore()
 
 const { editor } = storeToRefs(editorStore)
 const { output } = storeToRefs(renderStore)
 const { primaryColor } = storeToRefs(themeStore)
 const { isOpenRightSlider, isOpenAIPanel } = storeToRefs(uiStore)
 const { toggleAIPanel } = uiStore
+const { isHtmlMode, htmlContent } = storeToRefs(htmlEditorStore)
 const {
   type: aiServiceType,
   endpoint,
@@ -204,6 +208,75 @@ async function copy() {
     const mdContent = editor.value?.state.doc.toString() || ``
     await copyContent(mdContent)
     toast.success(`已复制 Markdown 源码到剪贴板。`)
+    return
+  }
+
+  // 如果是 HTML 模式，复制 HTML 内容（包含应用的样式）
+  if (isHtmlMode.value) {
+    const htmlOutputElement = document.getElementById(`html-output`)
+
+    if (!htmlOutputElement) {
+      toast.error(`未找到预览区域，请刷新页面后重试。`)
+      return
+    }
+
+    // 克隆元素以便内联样式
+    const clonedElement = htmlOutputElement.cloneNode(true) as HTMLElement
+
+    // 将用户修改的样式内联到对应的元素中
+    const styleOverrides = previewStyleStore.styleOverrides
+    styleOverrides.forEach((override) => {
+      try {
+        // 移除 #html-output 前缀来匹配克隆元素中的选择器
+        const selector = override.selector.replace(/^#html-output\s*/, ``)
+        const elements = selector ? clonedElement.querySelectorAll(selector) : []
+
+        elements.forEach((el) => {
+          const htmlEl = el as HTMLElement
+          const existingStyle = htmlEl.getAttribute(`style`) || ``
+
+          // 将样式对象转换为内联样式字符串
+          const newStyles = Object.entries(override.styles)
+            .map(([key, value]) => {
+              const kebabKey = key.replace(/([A-Z])/g, `-$1`).toLowerCase()
+              return `${kebabKey}: ${value}`
+            })
+            .join(`; `)
+
+          // 合并现有样式和新样式
+          const combinedStyle = existingStyle
+            ? `${existingStyle}; ${newStyles}`
+            : newStyles
+
+          htmlEl.setAttribute(`style`, combinedStyle)
+        })
+      }
+      catch (error) {
+        console.warn(`Failed to apply style override:`, error, override)
+      }
+    })
+
+    const htmlContentWithStyles = clonedElement.innerHTML
+
+    if (copyMode.value === `html`) {
+      await copyContent(htmlContentWithStyles)
+      toast.success(`已复制 HTML 源码到剪贴板。`)
+    }
+    else {
+      try {
+        const plainText = clonedElement.textContent || ``
+        const clipboardItem = new ClipboardItem({
+          'text/html': new Blob([htmlContentWithStyles], { type: `text/html` }),
+          'text/plain': new Blob([plainText], { type: `text/plain` }),
+        })
+        await navigator.clipboard.write([clipboardItem])
+        toast.success(`已复制渲染后的内容到剪贴板，可直接到公众号后台粘贴。`)
+      }
+      catch (error) {
+        await copyContent(htmlContentWithStyles)
+        toast.success(`已复制内容到剪贴板。`)
+      }
+    }
     return
   }
 
