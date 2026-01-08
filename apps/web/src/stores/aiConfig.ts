@@ -1,3 +1,4 @@
+import type { Config } from '@grisaiaevy/crafting-agent'
 import { serviceOptions } from '@md/shared/configs'
 import {
   DEFAULT_SERVICE_KEY,
@@ -50,15 +51,13 @@ async function setServiceConfig(serviceType: string, config: ServiceConfig): Pro
     category: AI_CONFIG_CATEGORY,
     key: serviceType,
     val: JSON.stringify(config),
-    id: existing?.id || `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-  }
+  } as Config
 
   if (existing) {
-    await storage.createConfig(configData)
+    configData.id = existing.id
   }
-  else {
-    await storage.createConfig(configData)
-  }
+
+  await storage.createConfig(configData)
 }
 
 async function clearOldConfigs(): Promise<void> {
@@ -156,15 +155,13 @@ export const useAIConfigStore = defineStore(`AIConfig`, () => {
       category: AI_CONFIG_CATEGORY,
       key: `global`,
       val: JSON.stringify({ type: type.value }),
-      id: existing?.id || `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-    }
+    } as Config
 
     if (existing) {
-      await storage.createConfig(globalData)
+      globalData.id = existing.id
     }
-    else {
-      await storage.createConfig(globalData)
-    }
+
+    await storage.createConfig(globalData)
   }
 
   watch(type, async (newType) => {
