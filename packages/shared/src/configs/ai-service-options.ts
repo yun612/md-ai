@@ -36,6 +36,12 @@ export const serviceOptions: ServiceOption[] = [
     ],
   },
   {
+    value: `minimax`,
+    label: `Minimax`,
+    endpoint: `https://api.minimaxi.com/anthropic/v1`,
+    models: [`MiniMax-M2`],
+  },
+  {
     value: `deepseek`,
     label: `DeepSeek`,
     endpoint: `https://api.deepseek.com/v1`,

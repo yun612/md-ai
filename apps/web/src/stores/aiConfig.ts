@@ -10,12 +10,12 @@ import { IndexedDBTaskStorage } from '../agents/indexeddb_storage'
 const AI_CONFIG_CATEGORY = `llm`
 
 interface ServiceConfig {
-  type: string
+  provider: string
   temperature: number
-  maxToken: number
+  maxTokens: number
   apiKey: string
-  model: string
-  endpoint: string
+  modelName: string
+  baseUrl: string
 }
 
 let storageInstance: IndexedDBTaskStorage | null = null
@@ -61,6 +61,26 @@ async function setServiceConfig(serviceType: string, config: ServiceConfig): Pro
   }
 }
 
+async function clearOldConfigs(): Promise<void> {
+  const storage = getStorage()
+  const configs = await storage.getConfigsByCategory(AI_CONFIG_CATEGORY)
+
+  for (const config of configs) {
+    if (config?.val) {
+      try {
+        const parsed = JSON.parse(config.val)
+        if (parsed.type !== undefined || parsed.model !== undefined || parsed.endpoint !== undefined || parsed.maxToken !== undefined) {
+          console.log(`[AIConfig] Clearing old config for key:`, config.key)
+          await storage.deleteConfig(config.id)
+        }
+      }
+      catch (e) {
+        console.error(`[AIConfig] Failed to parse config:`, e)
+      }
+    }
+  }
+}
+
 export const useAIConfigStore = defineStore(`AIConfig`, () => {
   const type = ref<string>(DEFAULT_SERVICE_TYPE)
   const temperature = ref<number>(DEFAULT_SERVICE_TEMPERATURE)
@@ -72,6 +92,8 @@ export const useAIConfigStore = defineStore(`AIConfig`, () => {
   const isLoaded = ref(false)
 
   async function loadConfig() {
+    await clearOldConfigs()
+
     const storage = getStorage()
     const globalConfig = await storage.getConfigByKey(`global`, AI_CONFIG_CATEGORY)
 
@@ -97,9 +119,10 @@ export const useAIConfigStore = defineStore(`AIConfig`, () => {
 
     if (savedConfig) {
       temperature.value = savedConfig.temperature ?? DEFAULT_SERVICE_TEMPERATURE
-      maxToken.value = savedConfig.maxToken ?? DEFAULT_SERVICE_MAX_TOKEN
-      model.value = svc.models.includes(savedConfig.model) ? savedConfig.model : svc.models[0]
+      maxToken.value = savedConfig.maxTokens ?? DEFAULT_SERVICE_MAX_TOKEN
+      model.value = svc.models.includes(savedConfig.modelName) ? savedConfig.modelName : svc.models[0]
       apiKey.value = savedConfig.apiKey || DEFAULT_SERVICE_KEY
+      endpoint.value = savedConfig.baseUrl || svc.endpoint
     }
     else {
       temperature.value = DEFAULT_SERVICE_TEMPERATURE
@@ -114,12 +137,12 @@ export const useAIConfigStore = defineStore(`AIConfig`, () => {
       return
 
     const config: ServiceConfig = {
-      type: type.value,
+      provider: type.value,
       temperature: temperature.value,
-      maxToken: maxToken.value,
+      maxTokens: maxToken.value,
       apiKey: apiKey.value,
-      model: model.value,
-      endpoint: endpoint.value,
+      modelName: model.value,
+      baseUrl: endpoint.value,
     }
 
     await setServiceConfig(type.value, config)
@@ -149,7 +172,7 @@ export const useAIConfigStore = defineStore(`AIConfig`, () => {
     await syncServiceConfig(newType)
   })
 
-  watch([temperature, maxToken, model, apiKey], async () => {
+  watch([temperature, maxToken, model, apiKey, endpoint], async () => {
     await saveCurrentConfig()
   }, { deep: true })
 
@@ -164,12 +187,12 @@ export const useAIConfigStore = defineStore(`AIConfig`, () => {
 
       if (existing) {
         const defaultConfig: ServiceConfig = {
-          type: service.value,
+          provider: service.value,
           temperature: DEFAULT_SERVICE_TEMPERATURE,
-          maxToken: DEFAULT_SERVICE_MAX_TOKEN,
+          maxTokens: DEFAULT_SERVICE_MAX_TOKEN,
           apiKey: DEFAULT_SERVICE_KEY,
-          model: service.models[0],
-          endpoint: service.endpoint,
+          modelName: service.models[0],
+          baseUrl: service.endpoint,
         }
 
         await storage.createConfig({

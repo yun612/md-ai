@@ -33,7 +33,7 @@
     "@aws-sdk/s3-request-presigner": "^3.919.0",
     "@codemirror/lang-html": "^6.4.11",
     "@exercism/highlightjs-gdscript": "^0.0.1",
-    "@grisaiaevy/crafting-agent": "^0.0.4",
+    "@grisaiaevy/crafting-agent": "^0.0.8",
     "@md/core": "workspace:*",
     "@md/shared": "workspace:*",
     "@mendable/firecrawl-js": "^1.29.3",

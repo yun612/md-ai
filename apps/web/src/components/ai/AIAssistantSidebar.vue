@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ModelConfig, TaskContext } from '@grisaiaevy/crafting-agent'
+import type { ContentBlock, ModelConfig, TaskContext } from '@grisaiaevy/crafting-agent'
 import type { ToolFunctionsContext } from './tool-box'
 import type { OutlineData, OutlineItem } from '@/components/OutlineEditor.vue'
 import type { QuickCommandRuntime } from '@/stores/quickCommands'
@@ -101,8 +101,13 @@ const outlineData = useStorage<OutlineData>(`ai_outline_data`, {
 
 /* ---------- 消息结构 ---------- */
 interface ChatMessage {
+  id?: string
+  projectId?: string
+  taskId?: string
+  conversationRound?: number
+  messageOrder?: number
   role: `user` | `assistant` | `system`
-  content: string
+  content: ContentBlock[]
   reasoning?: string
   done?: boolean
   searchResults?: Array<{
@@ -111,7 +116,7 @@ interface ChatMessage {
     snippet: string
     content?: string
   }>
-  showSearchResults?: boolean // 控制搜索结果是否展开显示
+  showSearchResults?: boolean
   imageResults?: Array<{
     url?: string
     base64?: string
@@ -119,6 +124,8 @@ interface ChatMessage {
     op?: string
     meta?: Record<string, any>
   }>
+  createdAt?: Date
+  updatedAt?: Date
 }
 
 const messages = ref<ChatMessage[]>([])
@@ -129,6 +136,52 @@ const { currentProject } = storeToRefs(projectStore)
 
 const tasks = ref<any[]>([])
 const currentTask = ref<any>(null)
+
+/* ---------- 辅助函数 ---------- */
+function createTextContentBlock(text: string): ContentBlock[] {
+  if (!text)
+    return []
+  return [{
+    type: `text`,
+    text,
+  }]
+}
+
+function getTextFromContentBlocks(content: ContentBlock[]): string {
+  if (!content || !Array.isArray(content))
+    return ``
+  return content
+    .filter(block => block.type === `text` && block.text)
+    .map(block => block.text)
+    .join(``)
+}
+
+function formatDateTime(date: Date | string | undefined): string {
+  if (!date)
+    return ``
+  const d = new Date(date)
+  const now = new Date()
+  const diff = now.getTime() - d.getTime()
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24))
+
+  if (days === 0) {
+    const hours = d.getHours().toString().padStart(2, `0`)
+    const minutes = d.getMinutes().toString().padStart(2, `0`)
+    return `今天 ${hours}:${minutes}`
+  }
+  else if (days === 1) {
+    return `昨天`
+  }
+  else if (days < 7) {
+    const weekdays = [`周日`, `周一`, `周二`, `周三`, `周四`, `周五`, `周六`]
+    return weekdays[d.getDay()]
+  }
+  else {
+    const month = (d.getMonth() + 1).toString().padStart(2, `0`)
+    const day = d.getDate().toString().padStart(2, `0`)
+    return `${month}-${day}`
+  }
+}
 
 async function loadTasks() {
   if (!currentProject.value?.id)
@@ -144,10 +197,17 @@ async function loadChatMessages(taskId: string) {
   const chatMessages = await storage.getChatMessagesByTaskId(taskId)
 
   messages.value = chatMessages.map((msg: any) => ({
+    id: msg.id,
+    projectId: msg.projectId,
+    taskId: msg.taskId,
+    conversationRound: msg.conversationRound,
+    messageOrder: msg.messageOrder,
     role: msg.role,
-    content: msg.content,
+    content: msg.content || [],
     reasoning: msg.reasoning,
     done: true,
+    createdAt: msg.createdAt,
+    updatedAt: msg.updatedAt,
   }))
 }
 
@@ -203,29 +263,23 @@ watch(currentProject, async () => {
   await loadTasks()
 })
 function getDefaultMessages(): ChatMessage[] {
-  return [{ role: `assistant`, content: `你好，我是 AI 助手，有什么可以帮你的？` }]
+  return [{ role: `assistant`, content: createTextContentBlock(`你好，我是 AI 助手，有什么可以帮你的？`) }]
 }
 
 // 清理消息数据，移除 base64 数据以节省存储空间,新的数据做了拷贝，复制，其余去除
 function cleanMessagesForStorage(messages: ChatMessage[]): ChatMessage[] {
-  //  map 展开数据，浅拷贝一份数据
   return messages.map((msg) => {
-    // 复制数据，保留原来的数据
     const cleaned = { ...msg }
 
-    // 清理图片结果中的 base64 数据，只保留 URL 和元数据
     if (cleaned.imageResults && Array.isArray(cleaned.imageResults)) {
       cleaned.imageResults = cleaned.imageResults.map((img: any) => {
-        // 只保留必要的字段，prompt描述，操作类型 op
         const cleanedImg: any = {
           prompt: img.prompt,
           op: img.op,
         }
-        // 只保留 URL，不保留 base64
         if (img.url && !img.url.startsWith(`data:image`)) {
           cleanedImg.url = img.url
         }
-        // 只保留必要的元数据
         if (img.meta?.algorithm_base_resp) {
           cleanedImg.meta = {
             algorithm_base_resp: img.meta.algorithm_base_resp,
@@ -235,14 +289,18 @@ function cleanMessagesForStorage(messages: ChatMessage[]): ChatMessage[] {
       })
     }
 
-    // 清理内容中的 base64 数据（如果内容包含 base64 图片）
-    if (cleaned.content && typeof cleaned.content === `string`) {
-      // 移除 Markdown 图片中的 base64 数据
-      cleaned.content = cleaned.content.replace(/!\[([^\]]*)\]\(data:image\/[^;]+;base64,[^\s)]+\)/g, `![$1](图片已生成)`)
-      // 移除 HTML img 标签中的 base64 数据
-      cleaned.content = cleaned.content.replace(/<img[^>]+src=["']data:image\/[^;]+;base64,[^"']+["'][^>]*>/g, `<img src="图片已生成" alt="图片">`)
-      // 移除纯 base64 数据 URL
-      cleaned.content = cleaned.content.replace(/data:image\/[^;]+;base64,[A-Za-z0-9+/=]{100,}/g, `[图片已生成]`)
+    if (cleaned.content && Array.isArray(cleaned.content)) {
+      cleaned.content = cleaned.content.map((block: ContentBlock) => {
+        if (block.type === `text` && block.text) {
+          return {
+            type: `text`,
+            text: block.text.replace(/!\[([^\]]*)\]\(data:image\/[^;]+;base64,[^\s)]+\)/g, `![$1](图片已生成)`)
+              .replace(/<img[^>]+src=["']data:image\/[^;]+;base64,[^"']+["'][^>]*>/g, `<img src="图片已生成" alt="图片">`)
+              .replace(/data:image\/[^;]+;base64,[A-Za-z0-9+/=]{100,}/g, `[图片已生成]`),
+          }
+        }
+        return block
+      })
     }
 
     return cleaned
@@ -447,7 +505,7 @@ async function regenerateLast() {
     i > 0 && arr[i - 1] === lastUser && m.role === `assistant`)
   if (idx !== -1)
     messages.value.splice(idx, 1)
-  input.value = lastUser.content
+  input.value = getTextFromContentBlocks(lastUser.content)
   await nextTick()
   sendMessage()
 }
@@ -624,6 +682,12 @@ function downloadBase64Image(base64: string, filename = `image.png`) {
   }
 }
 
+/* ---------- 选中历史任务 ---------- */
+function handleSelectTask(task: any) {
+  console.log(`选中任务:`, task)
+  currentTask.value = task
+}
+
 const toolContext: ToolFunctionsContext = {
   jimengConfig,
   saveJimengConfig,
@@ -639,16 +703,9 @@ function getTaskStorage(): IndexedDBTaskStorage {
 }
 
 function getModelConfig(): ModelConfig {
-  const providerMap: Record<string, NonNullable<ModelConfig[`agentModel`]>[`provider`]> = {
-    doubao: `doubao`,
-    google: `google`,
-    minimax: `minimax`,
-    openrouter: `openrouter`,
-  }
-
   return {
     agentModel: {
-      provider: providerMap[type.value] || `openrouter`,
+      provider: type.value,
       apiKey: apiKey.value,
       baseUrl: endpoint.value,
       modelName: model.value,
@@ -735,13 +792,13 @@ async function sendMessage() {
 
   messages.value.push({
     role: `user`,
-    content: userMessage,
+    content: createTextContentBlock(userMessage),
     done: true,
   })
 
   messages.value.push({
     role: `assistant`,
-    content: ``,
+    content: [],
     done: false,
   })
 
@@ -753,7 +810,8 @@ async function sendMessage() {
       const lastMessage = messages.value[messages.value.length - 1]
       if (lastMessage?.role === `assistant`) {
         if (chunk.content) {
-          lastMessage.content += chunk.content
+          const currentText = getTextFromContentBlocks(lastMessage.content)
+          lastMessage.content = createTextContentBlock(currentText + chunk.content)
         }
         if (chunk.reasoning) {
           lastMessage.reasoning = chunk.reasoning
@@ -774,7 +832,7 @@ async function sendMessage() {
     console.error(`[sendMessage] Error:`, error)
     const lastMessage = messages.value[messages.value.length - 1]
     if (lastMessage?.role === `assistant`) {
-      lastMessage.content = `抱歉，发生了错误：${error instanceof Error ? error.message : String(error)}`
+      lastMessage.content = createTextContentBlock(`抱歉，发生了错误：${error instanceof Error ? error.message : String(error)}`)
       lastMessage.done = true
     }
     toast.error(`发送消息失败`)
@@ -869,17 +927,20 @@ async function sendMessage() {
       <div class="text-xs font-medium text-muted-foreground mb-2">
         历史任务
       </div>
-      <div class="space-y-1">
+      <div class="space-y-1 max-h-24 overflow-y-auto">
         <Button
           v-for="task in tasks"
           :key="task.id"
           variant="ghost"
           size="sm"
-          class="w-full justify-start h-7 px-2 text-xs"
+          class="w-full justify-start h-auto py-1.5 px-2 text-xs flex-col items-start"
           :class="{ 'bg-primary/10': currentTask?.id === task.id }"
-          @click="currentTask = task"
+          @click="handleSelectTask(task)"
         >
-          <span class="truncate">{{ task.title || task.description || '未命名任务' }}</span>
+          <span class="truncate font-medium">{{ task.name || task.description || '未命名任务' }}</span>
+          <span class="text-[10px] text-muted-foreground mt-0.5">
+            {{ formatDateTime(task.createdAt) }}
+          </span>
         </Button>
       </div>
     </div>
@@ -922,7 +983,7 @@ async function sendMessage() {
               v-if="msg.content"
               class="break-words"
               :class="msg.role === 'assistant' ? 'markdown-content' : 'whitespace-pre-wrap'"
-              v-html="msg.role === 'assistant' ? renderMarkdown(msg.content) : msg.content"
+              v-html="msg.role === 'assistant' ? renderMarkdown(getTextFromContentBlocks(msg.content)) : getTextFromContentBlocks(msg.content)"
             />
             <div
               v-else-if="msg.role === 'assistant' && !msg.done"
@@ -1036,7 +1097,7 @@ async function sendMessage() {
               size="sm"
               class="h-7 px-2 text-xs"
               aria-label="复制内容"
-              @click="copyToClipboard(msg.content, index)"
+              @click="copyToClipboard(getTextFromContentBlocks(msg.content), index)"
             >
               <Check
                 v-if="copiedIndex === index"
@@ -1051,7 +1112,7 @@ async function sendMessage() {
               size="sm"
               class="h-7 px-2 text-xs"
               aria-label="编辑内容"
-              @click="editMessage(msg.content)"
+              @click="editMessage(getTextFromContentBlocks(msg.content))"
             >
               <Edit class="h-3.5 w-3.5 mr-1" />
               <span>编辑</span>

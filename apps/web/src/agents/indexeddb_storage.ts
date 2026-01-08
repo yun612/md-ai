@@ -94,19 +94,30 @@ export class IndexedDBTaskStorage extends TaskStorage {
   }
 
   async createConfig(data: Config): Promise<Config> {
-    if (!data.id) {
-      data.id = this.generateId()
+    let id = data.id
+
+    if (!id && data.key) {
+      const existing = await this.getConfigByKey(data.key, data.category)
+      if (existing) {
+        id = existing.id
+      }
+      else {
+        id = this.generateId()
+      }
+    }
+    else if (!id) {
+      id = this.generateId()
     }
 
     const config: Config = {
       ...data,
-      id: data.id,
+      id,
       createdAt: new Date(),
       updatedAt: new Date(),
     }
 
     await this.db.configs.put(config)
-    console.log(`[IndexedDBStorage] Config created:`, config)
+    console.log(`[IndexedDBStorage] Config created/updated:`, config)
     return config
   }
 
@@ -122,6 +133,15 @@ export class IndexedDBTaskStorage extends TaskStorage {
 
     const config = await query.first()
     return config || null
+  }
+
+  async getConfigsByCategory(category: string): Promise<Config[]> {
+    return await this.db.configs.where(`category`).equals(category).toArray()
+  }
+
+  async deleteConfig(id: string): Promise<void> {
+    await this.db.configs.delete(id)
+    console.log(`[IndexedDBStorage] Config deleted:`, id)
   }
 
   async createChatMessage(data: ChatMessage): Promise<ChatMessage> {
@@ -185,5 +205,10 @@ export class IndexedDBTaskStorage extends TaskStorage {
       configs,
       messagesCount: messageCount,
     }
+  }
+
+  async clearConfigsByCategory(category: string): Promise<void> {
+    await this.db.configs.where(`category`).equals(category).delete()
+    console.log(`[IndexedDBStorage] Configs cleared for category:`, category)
   }
 }
