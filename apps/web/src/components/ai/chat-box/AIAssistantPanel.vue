@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import type { QuickCommandRuntime } from '@/stores/quickCommands'
 import {
   Check,
   Copy,
@@ -7,7 +6,6 @@ import {
   Image as ImageIcon,
   MessageCircle,
   Pause,
-  Plus,
   RefreshCcw,
   Send,
   Settings,
@@ -25,7 +23,6 @@ import { Textarea } from '@/components/ui/textarea'
 import useAIConfigStore from '@/stores/aiConfig'
 import { useDisplayStore } from '@/stores/display'
 import { useEditorStore } from '@/stores/editor'
-import { useQuickCommands } from '@/stores/quickCommands'
 import { copyPlain } from '@/utils/clipboard'
 
 /* ---------- 组件属性 ---------- */
@@ -58,7 +55,6 @@ const fetchController = ref<AbortController | null>(null)
 const copiedIndex = ref<number | null>(null)
 const memoryKey = `ai_memory_context`
 const isQuoteAllContent = ref(false)
-const cmdMgrOpen = ref(false)
 
 /* ---------- 消息结构 ---------- */
 interface ChatMessage {
@@ -71,40 +67,6 @@ interface ChatMessage {
 const messages = ref<ChatMessage[]>([])
 const AIConfigStore = useAIConfigStore()
 const { apiKey, endpoint, model, temperature, maxToken, type } = storeToRefs(AIConfigStore)
-
-/* ---------- 快捷指令 ---------- */
-const quickCmdStore = useQuickCommands()
-
-// 选中文字，点击指令，可以把文字复制过去
-function getSelectedText(): string {
-  try {
-    const cm: any = editor.value
-    if (!cm)
-      return ``
-    if (typeof cm.getSelection === `function`)
-      return cm.getSelection() || ``
-    return ``
-  }
-  catch (e) {
-    console.warn(`获取选中文本失败`, e)
-    return ``
-  }
-}
-
-function applyQuickCommand(cmd: QuickCommandRuntime) {
-  const selected = getSelectedText()
-  input.value = cmd.buildPrompt(selected)
-  historyIndex.value = null
-  nextTick(() => {
-    const textarea = document.querySelector(
-      `textarea[placeholder*="说些什么" ]`,
-    ) as HTMLTextAreaElement | null
-    textarea?.focus()
-    if (textarea) {
-      textarea.setSelectionRange(textarea.value.length, textarea.value.length)
-    }
-  })
-}
 
 /* ---------- 初始数据 ---------- */
 onMounted(async () => {
@@ -433,43 +395,6 @@ async function sendMessage() {
           使用 AI 助手帮助您编写和优化内容
         </DialogDescription>
       </DialogHeader>
-
-      <!-- ============ 快捷指令 ============ -->
-      <div
-        v-if="!configVisible"
-        class="mb-3 flex flex-wrap gap-2 overflow-x-auto pb-1"
-      >
-        <template v-if="quickCmdStore.commands.length">
-          <Button
-            v-for="cmd in quickCmdStore.commands"
-            :key="cmd.id"
-            variant="secondary"
-            size="sm"
-            class="text-xs"
-            @click="applyQuickCommand(cmd)"
-          >
-            {{ cmd.label }}
-          </Button>
-        </template>
-        <template v-else>
-          <div
-            class="text-muted-foreground flex items-center gap-2 border rounded-md border-dashed px-3 py-1 text-xs"
-          >
-            还没有任何快捷指令，点击右侧添加
-          </div>
-        </template>
-        <Button
-          variant="ghost"
-          size="icon"
-          title="管理指令"
-          @click="cmdMgrOpen = true"
-        >
-          <Plus class="h-4 w-4" />
-        </Button>
-
-        <!-- 指令管理弹窗 -->
-        <QuickCommandManager v-model:open="cmdMgrOpen" />
-      </div>
 
       <!-- ============ 参数配置面板 ============ -->
       <AIConfig

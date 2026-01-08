@@ -2,32 +2,26 @@
 import type { ContentBlock, ModelConfig, TaskContext } from '@grisaiaevy/crafting-agent'
 import type { ToolFunctionsContext } from './tool-box'
 import type { OutlineData, OutlineItem } from '@/components/OutlineEditor.vue'
-import type { QuickCommandRuntime } from '@/stores/quickCommands'
 import { Agent } from '@grisaiaevy/crafting-agent'
 import { useStorage } from '@vueuse/core'
-import DOMPurify from 'isomorphic-dompurify'
 import {
   Bot,
   Check,
   Copy,
-  Edit,
   FileText,
   Image as ImageIcon,
   MessageCircle,
   Pause,
-  Plus,
-  RefreshCcw,
   Send,
   Settings,
   Trash2,
 } from 'lucide-vue-next'
-import { marked } from 'marked'
 
 import { nanoid } from 'nanoid'
 import { toast } from 'vue-sonner'
 import { IndexedDBTaskStorage } from '@/agents/indexeddb_storage'
 import AIConfig from '@/components/ai/chat-box/AIConfig.vue'
-import QuickCommandManager from '@/components/ai/chat-box/QuickCommandManager.vue'
+import MessageBlock from '@/components/ai/chat-box/MessageBlock.vue'
 import OutlineEditor from '@/components/OutlineEditor.vue'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -35,7 +29,6 @@ import useAIConfigStore from '@/stores/aiConfig'
 import { useDisplayStore } from '@/stores/display'
 import { useEditorStore } from '@/stores/editor'
 import { useProjectStore } from '@/stores/project'
-import { useQuickCommands } from '@/stores/quickCommands'
 import { copyPlain } from '@/utils/clipboard'
 import { BrowserToolHandler, SimplePromptBuilder } from '../../agents/index'
 
@@ -56,7 +49,6 @@ const fetchController = ref<AbortController | null>(null)
 const copiedIndex = ref<number | null>(null)
 const memoryKey = `ai_memory_context`
 const isQuoteAllContent = ref(false)
-const cmdMgrOpen = ref(false)
 const outlineVisible = ref(false)
 
 /* ---------- 即梦API配置 ---------- */
@@ -216,39 +208,6 @@ watch(currentTask, async (newTask) => {
     await loadChatMessages(newTask.id)
   }
 })
-
-/* ---------- 快捷指令 ---------- */
-const quickCmdStore = useQuickCommands()
-
-function getSelectedText(): string {
-  try {
-    const cm: any = editor.value
-    if (!cm)
-      return ``
-    if (typeof cm.getSelection === `function`)
-      return cm.getSelection() || ``
-    return ``
-  }
-  catch (e) {
-    console.warn(`获取选中文本失败`, e)
-    return ``
-  }
-}
-
-function applyQuickCommand(cmd: QuickCommandRuntime) {
-  const selected = getSelectedText()
-  input.value = cmd.buildPrompt(selected)
-  historyIndex.value = null
-  nextTick(() => {
-    const textarea = document.querySelector(
-      `.ai-sidebar-textarea`,
-    ) as HTMLTextAreaElement | null
-    textarea?.focus()
-    if (textarea) {
-      textarea.setSelectionRange(textarea.value.length, textarea.value.length)
-    }
-  })
-}
 
 /* ---------- 初始数据 ---------- */
 onMounted(async () => {
@@ -416,37 +375,6 @@ function editMessage(content: string) {
       textarea.setSelectionRange(len, len)
     }
   })
-}
-
-// 渲染markdown
-function renderMarkdown(content: string): string {
-  if (!content)
-    return ``
-  try {
-    // 预处理：确保内容中没有会导致解析错误的格式
-    const safeContent = content
-      .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_match, alt, url) => {
-        // 清理图片 alt 文本，确保是安全的字符串
-        const safeAlt = (alt || `图片`)
-          .toString()
-          .replace(/[[\]()]/g, ``)
-          .replace(/\n/g, ` `)
-          .trim() || `图片`
-        return `![${safeAlt}](${url})`
-      })
-
-    const html = marked.parse(safeContent) as string
-    return DOMPurify.sanitize(html, {
-      ALLOWED_TAGS: [`p`, `br`, `strong`, `em`, `code`, `pre`, `ul`, `ol`, `li`, `h1`, `h2`, `h3`, `h4`, `h5`, `h6`, `blockquote`, `a`, `img`],
-      ALLOWED_ATTR: [`href`, `src`, `alt`, `title`, `class`, `target`, `rel`],
-    })
-  }
-  catch (e) {
-    console.error(`Markdown渲染失败:`, e)
-    console.error(`失败的内容:`, content.substring(0, 200))
-    // 如果渲染失败，返回转义后的纯文本
-    return content.replace(/</g, `&lt;`).replace(/>/g, `&gt;`).replace(/\n/g, `<br>`)
-  }
 }
 
 function resetMessages() {
@@ -888,37 +816,6 @@ async function sendMessage() {
       </div>
     </div>
 
-    <!-- 快捷指令栏 -->
-    <div
-      v-if="!configVisible && !outlineVisible"
-      class="ai-sidebar-commands border-b bg-muted/30 px-3 py-2"
-    >
-      <div class="flex items-center gap-2 overflow-x-auto">
-        <template v-if="quickCmdStore.commands.length">
-          <Button
-            v-for="cmd in quickCmdStore.commands.slice(0, 3)"
-            :key="cmd.id"
-            variant="secondary"
-            size="sm"
-            class="h-7 shrink-0 text-xs"
-            @click="applyQuickCommand(cmd)"
-          >
-            {{ cmd.label }}
-          </Button>
-        </template>
-        <Button
-          variant="ghost"
-          size="icon"
-          class="h-7 w-7 shrink-0"
-          title="管理指令"
-          @click="cmdMgrOpen = true"
-        >
-          <Plus class="h-3.5 w-3.5" />
-        </Button>
-      </div>
-      <QuickCommandManager v-model:open="cmdMgrOpen" />
-    </div>
-
     <!-- 历史任务列表 -->
     <div
       v-if="!configVisible && !outlineVisible && tasks.length > 0"
@@ -961,175 +858,19 @@ async function sendMessage() {
       class="ai-sidebar-chat-container ai-sidebar-chat flex-1 overflow-y-auto px-3 py-3"
     >
       <div class="space-y-3">
-        <div
+        <MessageBlock
           v-for="(msg, index) in messages"
           :key="index"
-          class="w-full"
-        >
-          <!-- 消息内容框 -->
-          <div
-            class="w-full rounded-md px-3 py-2.5 text-sm leading-relaxed overflow-x-auto"
-            :class="msg.role === 'user'
-              ? 'bg-primary text-primary-foreground'
-              : 'bg-muted/50 text-muted-foreground border border-border/50'"
-          >
-            <!-- reasoning -->
-            <div v-if="msg.reasoning" class="mb-1 text-xs italic opacity-70 break-words">
-              {{ msg.reasoning }}
-            </div>
-
-            <!-- 内容 -->
-            <div
-              v-if="msg.content"
-              class="break-words"
-              :class="msg.role === 'assistant' ? 'markdown-content' : 'whitespace-pre-wrap'"
-              v-html="msg.role === 'assistant' ? renderMarkdown(getTextFromContentBlocks(msg.content)) : getTextFromContentBlocks(msg.content)"
-            />
-            <div
-              v-else-if="msg.role === 'assistant' && !msg.done"
-              class="animate-pulse opacity-50"
-            >
-              思考中…
-            </div>
-
-            <!-- 搜索结果列表（可折叠） -->
-            <div v-if="msg.searchResults && msg.searchResults.length > 0" class="mt-3 pt-2 border-t border-border/30">
-              <button
-                class="flex items-center gap-1 text-xs font-medium opacity-70 hover:opacity-100 transition-opacity mb-2"
-                @click="msg.showSearchResults = !msg.showSearchResults"
-              >
-                <span>{{ msg.showSearchResults ? '▼' : '▶' }}</span>
-                <span>搜索结果（{{ msg.searchResults.length }} 条）</span>
-              </button>
-              <div v-if="msg.showSearchResults" class="space-y-2">
-                <div
-                  v-for="(result, resultIndex) in msg.searchResults"
-                  :key="resultIndex"
-                  class="border border-border/50 rounded-md p-2.5 hover:bg-muted/30 transition-colors cursor-pointer group"
-                >
-                  <a
-                    :href="result.url"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    class="block no-underline"
-                    @click.stop
-                  >
-                    <div class="font-medium text-sm text-primary hover:text-primary/80 group-hover:underline mb-1.5 line-clamp-1">
-                      {{ result.title }}
-                    </div>
-                    <div class="text-xs text-muted-foreground line-clamp-2 mb-1.5">
-                      {{ result.snippet }}
-                    </div>
-                    <div class="text-xs text-muted-foreground/60 truncate">
-                      {{ result.url }}
-                    </div>
-                  </a>
-                </div>
-              </div>
-            </div>
-
-            <!-- 图片结果列表 -->
-            <div v-if="msg.imageResults && msg.imageResults.length > 0" class="mt-3 space-y-3 pt-2 border-t border-border/30">
-              <div class="text-xs font-medium opacity-70">
-                图片结果：
-              </div>
-              <div class="grid grid-cols-2 gap-2">
-                <div
-                  v-for="(img, idx) in msg.imageResults"
-                  :key="idx"
-                  class="border border-border/50 rounded-md p-2 bg-background/60"
-                >
-                  <a
-                    v-if="img.url"
-                    :href="img.url"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    class="block"
-                    @click.stop
-                  >
-                    <img :src="img.url" alt="image result" class="w-full h-auto rounded-sm">
-                  </a>
-                  <img
-                    v-else-if="img.base64"
-                    :src="`data:image/png;base64,${img.base64}`"
-                    alt="image result"
-                    class="w-full h-auto rounded-sm"
-                  >
-                  <div class="mt-1 flex items-center justify-between">
-                    <span class="text-[10px] uppercase opacity-60">{{ img.op || 'image' }}</span>
-                    <div class="flex items-center gap-2">
-                      <button
-                        class="text-[10px] px-2 py-0.5 bg-primary text-primary-foreground rounded hover:opacity-90 transition-opacity"
-                        title="插入到编辑器"
-                        @click.stop="applyImageToEditor(img)"
-                      >
-                        应用
-                      </button>
-                      <a
-                        v-if="img.url"
-                        :href="img.url"
-                        download
-                        class="text-[10px] underline opacity-70 hover:opacity-100"
-                        @click.stop
-                      >下载</a>
-                      <button
-                        v-else-if="img.base64"
-                        class="text-[10px] underline opacity-70 hover:opacity-100"
-                        @click.stop="downloadBase64Image(img.base64!, `image-${idx}.png`)"
-                      >
-                        下载
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- 工具按钮 - 放在消息框下方 -->
-          <div
-            class="flex items-center gap-1 mt-1"
-            :class="msg.role === 'user' ? 'justify-end' : 'justify-start'"
-          >
-            <Button
-              v-if="index > 0 && !(msg.role === 'assistant' && index === messages.length - 1 && !msg.done)"
-              variant="ghost"
-              size="sm"
-              class="h-7 px-2 text-xs"
-              aria-label="复制内容"
-              @click="copyToClipboard(getTextFromContentBlocks(msg.content), index)"
-            >
-              <Check
-                v-if="copiedIndex === index"
-                class="h-3.5 w-3.5 mr-1 text-green-600"
-              />
-              <Copy v-else class="h-3.5 w-3.5 mr-1" />
-              <span>复制</span>
-            </Button>
-            <Button
-              v-if="index > 0 && !(msg.role === 'assistant' && index === messages.length - 1 && !msg.done)"
-              variant="ghost"
-              size="sm"
-              class="h-7 px-2 text-xs"
-              aria-label="编辑内容"
-              @click="editMessage(getTextFromContentBlocks(msg.content))"
-            >
-              <Edit class="h-3.5 w-3.5 mr-1" />
-              <span>编辑</span>
-            </Button>
-            <Button
-              v-if="msg.role === 'assistant' && msg.done && index === messages.length - 1"
-              variant="ghost"
-              size="sm"
-              class="h-7 px-2 text-xs"
-              aria-label="重新生成"
-              @click="regenerateLast"
-            >
-              <RefreshCcw class="h-3.5 w-3.5 mr-1" />
-              <span>重新生成</span>
-            </Button>
-          </div>
-        </div>
+          :msg="msg"
+          :index="index"
+          :is-last-message="index === messages.length - 1"
+          :copied-index="copiedIndex"
+          @copy="copyToClipboard"
+          @edit="editMessage"
+          @regenerate="regenerateLast"
+          @apply-image="applyImageToEditor"
+          @download-image="downloadBase64Image"
+        />
       </div>
     </div>
 
@@ -1274,23 +1015,6 @@ async function sendMessage() {
   min-width: 0;
 }
 
-/* Markdown内容样式 */
-.ai-sidebar-chat-container .markdown-content {
-  line-height: 1.6;
-}
-
-.ai-sidebar-chat-container .markdown-content p {
-  margin: 0.5rem 0;
-}
-
-.ai-sidebar-chat-container .markdown-content p:first-child {
-  margin-top: 0;
-}
-
-.ai-sidebar-chat-container .markdown-content p:last-child {
-  margin-bottom: 0;
-}
-
 /* 图片样式 */
 .ai-sidebar-chat-container img {
   max-width: 100%;
@@ -1300,49 +1024,5 @@ async function sendMessage() {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   display: block;
   border: 1px solid hsl(var(--border) / 0.3);
-}
-
-.ai-sidebar-chat-container .markdown-content img {
-  max-width: 100%;
-  height: auto;
-  border-radius: 0.5rem;
-  margin: 0.75rem 0;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  display: block;
-  border: 1px solid hsl(var(--border) / 0.3);
-  cursor: pointer;
-  transition: transform 0.2s ease;
-}
-
-.ai-sidebar-chat-container .markdown-content img:hover {
-  transform: scale(1.02);
-}
-
-/* 引用块样式 */
-.ai-sidebar-chat-container blockquote {
-  border-left: 3px solid hsl(var(--primary));
-  padding-left: 1rem;
-  margin: 1rem 0;
-  color: hsl(var(--muted-foreground));
-  font-style: italic;
-  background-color: hsl(var(--muted) / 0.3);
-  padding: 0.75rem 1rem;
-  border-radius: 0 0.375rem 0.375rem 0;
-}
-
-.ai-sidebar-chat-container thead {
-  background-color: hsl(var(--muted));
-}
-
-.ai-sidebar-chat-container th,
-.ai-sidebar-chat-container td {
-  padding: 0.5rem 0.75rem;
-  border: 1px solid hsl(var(--border));
-  text-align: left;
-}
-
-.ai-sidebar-chat-container th {
-  font-weight: 600;
-  background-color: hsl(var(--muted) / 0.5);
 }
 </style>
