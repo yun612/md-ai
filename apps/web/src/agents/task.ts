@@ -35,9 +35,6 @@ export class BrowserToolHandler implements ToolHandler {
   }
 }
 
-/**
- * 简单的 SystemPromptBuilder 实现
- */
 export class SimplePromptBuilder implements ISystemPromptBuilder {
   async buildSystemPrompt(): Promise<string> {
     return `You are a helpful AI assistant for markdown editing.
@@ -46,7 +43,8 @@ Help users with markdown content creation and editing.`
   }
 
   async buildEnvironmentDetails(): Promise<string> {
-    return `Browser environment: ${navigator.userAgent}
-Current time: ${new Date().toISOString()}`
+    return `Current time: ${new Date().toISOString()}
+
+`
   }
 }

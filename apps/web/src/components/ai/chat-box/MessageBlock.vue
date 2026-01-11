@@ -1,19 +1,14 @@
 <script setup lang="ts">
-import type { ContentBlock } from '@grisaiaevy/crafting-agent'
+import type { ChatMessage as BaseChatMessage, ContentBlock } from '@grisaiaevy/crafting-agent'
 import DOMPurify from 'isomorphic-dompurify'
 import { Check, Copy, Edit, RefreshCcw } from 'lucide-vue-next'
 import { marked } from 'marked'
 import { ref } from 'vue'
 import { Button } from '@/components/ui/button'
 
-interface ChatMessage {
+interface ChatMessage extends Omit<BaseChatMessage, `role` | `id`> {
   id?: string
-  projectId?: string
-  taskId?: string
-  conversationRound?: number
-  messageOrder?: number
   role: `user` | `assistant` | `system`
-  content: ContentBlock[]
   reasoning?: string
   done?: boolean
   searchResults?: Array<{
@@ -30,8 +25,6 @@ interface ChatMessage {
     op?: string
     meta?: Record<string, any>
   }>
-  createdAt?: Date
-  updatedAt?: Date
 }
 
 interface Props {
@@ -91,11 +84,11 @@ function renderMarkdown(content: string): string {
 }
 
 function handleCopy() {
-  emit(`copy`, getTextFromContentBlocks(props.msg.content), props.index)
+  emit(`copy`, getTextFromContentBlocks(props.msg.content || []), props.index)
 }
 
 function handleEdit() {
-  emit(`edit`, getTextFromContentBlocks(props.msg.content))
+  emit(`edit`, getTextFromContentBlocks(props.msg.content || []))
 }
 
 function handleRegenerate() {
@@ -126,17 +119,27 @@ function handleDownloadImage(base64: string, filename: string) {
       </div>
 
       <!-- 内容 -->
+      <template v-if="msg.role === 'assistant'">
+        <div
+          v-if="getTextFromContentBlocks(msg.content || [])"
+          class="break-words markdown-content"
+          v-html="renderMarkdown(getTextFromContentBlocks(msg.content || []))"
+        />
+        <div
+          v-else-if="!msg.done"
+          class="animate-pulse opacity-50"
+        >
+          思考中…
+        </div>
+        <div v-else class="text-xs opacity-50">
+          (无内容)
+        </div>
+      </template>
       <div
-        v-if="msg.content"
-        class="break-words"
-        :class="msg.role === 'assistant' ? 'markdown-content' : 'whitespace-pre-wrap'"
-        v-html="msg.role === 'assistant' ? renderMarkdown(getTextFromContentBlocks(msg.content)) : getTextFromContentBlocks(msg.content)"
-      />
-      <div
-        v-else-if="msg.role === 'assistant' && !msg.done"
-        class="animate-pulse opacity-50"
+        v-else
+        class="break-words whitespace-pre-wrap"
       >
-        思考中…
+        {{ getTextFromContentBlocks(msg.content || []) }}
       </div>
 
       <!-- 搜索结果列表（可折叠） -->
