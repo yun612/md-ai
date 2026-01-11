@@ -35,7 +35,10 @@ watch(model, () => {
 
 /* -------------------------- 操作 -------------------------- */
 
-function saveConfig(emitEvent = true) {
+async function saveConfig(emitEvent = true) {
+  await AIConfigStore.saveCurrentConfig()
+  await AIConfigStore.saveGlobalConfig()
+
   if (emitEvent) {
     testResult.value = `配置已保存`
     emit(`saved`)

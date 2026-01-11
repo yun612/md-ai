@@ -18,18 +18,18 @@
 
 ```typescript
 import {
-  loadHeadingTemplate,
   generateHeadingHTML,
+  loadHeadingTemplate,
 } from "@/utils/headingTemplate";
 
 // 加载模板配置
 const config = loadHeadingTemplate();
 
 // 生成 H2 标题 HTML
-const h2HTML = generateHeadingHTML(2, "这是二级标题", config);
+const h2HTML = generateHeadingHTML(2, `这是二级标题`, config);
 
 // 生成 H3 标题 HTML
-const h3HTML = generateHeadingHTML(3, "这是三级标题", config);
+const h3HTML = generateHeadingHTML(3, `这是三级标题`, config);
 ```
 
 ### 2. 在渲染器中使用

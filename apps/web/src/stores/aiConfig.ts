@@ -45,6 +45,8 @@ async function getServiceConfig(serviceType: string): Promise<ServiceConfig | nu
 
 async function setServiceConfig(serviceType: string, config: ServiceConfig): Promise<void> {
   const storage = getStorage()
+
+  // 通过 category + key 查询现有配置
   const existing = await storage.getConfigByKey(serviceType, AI_CONFIG_CATEGORY)
 
   const configData = {
@@ -53,7 +55,8 @@ async function setServiceConfig(serviceType: string, config: ServiceConfig): Pro
     val: JSON.stringify(config),
   } as Config
 
-  if (existing) {
+  // 如果存在，传递 id 以确保更新而不是创建新记录
+  if (existing?.id) {
     configData.id = existing.id
   }
 
@@ -80,6 +83,39 @@ async function clearOldConfigs(): Promise<void> {
   }
 }
 
+async function clearDuplicateConfigs(): Promise<void> {
+  const storage = getStorage()
+  const configs = await storage.getConfigsByCategory(AI_CONFIG_CATEGORY)
+
+  // 按 key 分组，保留最新的记录
+  const configsByKey = new Map<string, Config[]>()
+
+  for (const config of configs) {
+    if (!configsByKey.has(config.key)) {
+      configsByKey.set(config.key, [])
+    }
+    configsByKey.get(config.key)!.push(config)
+  }
+
+  // 删除重复的配置，只保留最新的一条
+  for (const [key, configList] of configsByKey) {
+    if (configList.length > 1) {
+      // 按 updatedAt 排序，保留最新的
+      configList.sort((a, b) => {
+        const aTime = a.updatedAt ? new Date(a.updatedAt).getTime() : 0
+        const bTime = b.updatedAt ? new Date(b.updatedAt).getTime() : 0
+        return bTime - aTime
+      })
+
+      // 删除除了第一条（最新）之外的所有记录
+      for (let i = 1; i < configList.length; i++) {
+        console.log(`[AIConfig] Deleting duplicate config for key "${key}":`, configList[i].id)
+        await storage.deleteConfig(configList[i].id)
+      }
+    }
+  }
+}
+
 export const useAIConfigStore = defineStore(`AIConfig`, () => {
   const type = ref<string>(DEFAULT_SERVICE_TYPE)
   const temperature = ref<number>(DEFAULT_SERVICE_TEMPERATURE)
@@ -92,6 +128,7 @@ export const useAIConfigStore = defineStore(`AIConfig`, () => {
 
   async function loadConfig() {
     await clearOldConfigs()
+    await clearDuplicateConfigs()
 
     const storage = getStorage()
     const globalConfig = await storage.getConfigByKey(`global`, AI_CONFIG_CATEGORY)
@@ -119,7 +156,7 @@ export const useAIConfigStore = defineStore(`AIConfig`, () => {
     if (savedConfig) {
       temperature.value = savedConfig.temperature ?? DEFAULT_SERVICE_TEMPERATURE
       maxToken.value = savedConfig.maxTokens ?? DEFAULT_SERVICE_MAX_TOKEN
-      model.value = svc.models.includes(savedConfig.modelName) ? savedConfig.modelName : svc.models[0]
+      model.value = savedConfig.modelName ?? ``
       apiKey.value = savedConfig.apiKey || DEFAULT_SERVICE_KEY
       endpoint.value = savedConfig.baseUrl || svc.endpoint
     }
@@ -157,7 +194,8 @@ export const useAIConfigStore = defineStore(`AIConfig`, () => {
       val: JSON.stringify({ type: type.value }),
     } as Config
 
-    if (existing) {
+    // 如果存在，传递 id 以确保更新而不是创建新记录
+    if (existing?.id) {
       globalData.id = existing.id
     }
 
@@ -165,13 +203,8 @@ export const useAIConfigStore = defineStore(`AIConfig`, () => {
   }
 
   watch(type, async (newType) => {
-    await saveGlobalConfig()
     await syncServiceConfig(newType)
   })
-
-  watch([temperature, maxToken, model, apiKey, endpoint], async () => {
-    await saveCurrentConfig()
-  }, { deep: true })
 
   const reset = async () => {
     type.value = DEFAULT_SERVICE_TYPE
@@ -216,6 +249,8 @@ export const useAIConfigStore = defineStore(`AIConfig`, () => {
     isLoaded,
     reset,
     loadConfig,
+    saveCurrentConfig,
+    saveGlobalConfig,
   }
 })
 

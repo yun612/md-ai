@@ -96,12 +96,12 @@ export class IndexedDBTaskStorage extends TaskStorage {
   async createConfig(data: Config): Promise<Config> {
     let id = data.id
 
-    if (!id && data.key) {
+    if (data.key && data.category) {
       const existing = await this.getConfigByKey(data.key, data.category)
       if (existing) {
         id = existing.id
       }
-      else {
+      else if (!id) {
         id = this.generateId()
       }
     }
@@ -169,7 +169,7 @@ export class IndexedDBTaskStorage extends TaskStorage {
     return await this.db.chatMessages
       .where(`taskId`)
       .equals(taskId)
-      .sortBy(`conversationRound`)
+      .sortBy(`createdAt`)
   }
 
   private generateId(): string {

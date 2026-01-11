@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ContentBlock, ModelConfig, TaskContext } from '@grisaiaevy/crafting-agent'
+import type { ChatMessage as BaseChatMessage, ContentBlock, ModelConfig, TaskContext } from '@grisaiaevy/crafting-agent'
 import type { ToolFunctionsContext } from './tool-box'
 import type { OutlineData, OutlineItem } from '@/components/OutlineEditor.vue'
 import { Agent } from '@grisaiaevy/crafting-agent'
@@ -12,6 +12,7 @@ import {
   Image as ImageIcon,
   MessageCircle,
   Pause,
+  Plus,
   Send,
   Settings,
   Trash2,
@@ -30,7 +31,7 @@ import { useDisplayStore } from '@/stores/display'
 import { useEditorStore } from '@/stores/editor'
 import { useProjectStore } from '@/stores/project'
 import { copyPlain } from '@/utils/clipboard'
-import { BrowserToolHandler, SimplePromptBuilder } from '../../agents/index'
+import { GenerateOutlineToolHandler, SimplePromptBuilder } from '../../agents/index'
 
 const editorStore = useEditorStore()
 const { editor } = storeToRefs(editorStore)
@@ -92,14 +93,9 @@ const outlineData = useStorage<OutlineData>(`ai_outline_data`, {
 })
 
 /* ---------- 消息结构 ---------- */
-interface ChatMessage {
+interface ChatMessage extends Omit<BaseChatMessage, `role` | `id`> {
   id?: string
-  projectId?: string
-  taskId?: string
-  conversationRound?: number
-  messageOrder?: number
   role: `user` | `assistant` | `system`
-  content: ContentBlock[]
   reasoning?: string
   done?: boolean
   searchResults?: Array<{
@@ -116,8 +112,6 @@ interface ChatMessage {
     op?: string
     meta?: Record<string, any>
   }>
-  createdAt?: Date
-  updatedAt?: Date
 }
 
 const messages = ref<ChatMessage[]>([])
@@ -187,7 +181,7 @@ async function loadTasks() {
 async function loadChatMessages(taskId: string) {
   const storage = new IndexedDBTaskStorage()
   const chatMessages = await storage.getChatMessagesByTaskId(taskId)
-
+  console.log(`[AIAssistantSidebar] Loaded chat messages:`, chatMessages)
   messages.value = chatMessages.map((msg: any) => ({
     id: msg.id,
     projectId: msg.projectId,
@@ -204,7 +198,7 @@ async function loadChatMessages(taskId: string) {
 }
 
 watch(currentTask, async (newTask) => {
-  if (newTask?.id) {
+  if (newTask?.id && !loading.value) {
     await loadChatMessages(newTask.id)
   }
 })
@@ -393,6 +387,25 @@ function resetMessages() {
   scrollToBottom(true)
 }
 
+function newConversation() {
+  if (fetchController.value) {
+    fetchController.value.abort()
+    fetchController.value = null
+  }
+  messages.value = getDefaultMessages()
+  currentTask.value = null
+  input.value = ``
+  loading.value = false
+  try {
+    const cleanedMessages = cleanMessagesForStorage(messages.value)
+    localStorage.setItem(memoryKey, JSON.stringify(cleanedMessages))
+  }
+  catch (e) {
+    console.error(`[存储] 新增对话时保存失败:`, e)
+  }
+  scrollToBottom(true)
+}
+
 function pauseStreaming() {
   if (fetchController.value) {
     fetchController.value.abort()
@@ -433,7 +446,7 @@ async function regenerateLast() {
     i > 0 && arr[i - 1] === lastUser && m.role === `assistant`)
   if (idx !== -1)
     messages.value.splice(idx, 1)
-  input.value = getTextFromContentBlocks(lastUser.content)
+  input.value = getTextFromContentBlocks(lastUser.content || [])
   await nextTick()
   sendMessage()
 }
@@ -648,15 +661,7 @@ async function startTaskWithStreaming(
 ) {
   const taskStorage = getTaskStorage()
 
-  let taskId: string
-  if (currentTask.value?.id) {
-    taskId = currentTask.value.id
-  }
-  else {
-    taskId = nanoid()
-    currentTask.value = { id: taskId, title: userInstruction.substring(0, 50) }
-  }
-
+  const taskId = currentTask.value?.id || nanoid()
   const projectId = currentProject.value?.id || ``
 
   const modelConfig = getModelConfig()
@@ -665,9 +670,9 @@ async function startTaskWithStreaming(
     modelConfig,
     variables: {
     },
-    systemPromptBuilder: new SimplePromptBuilder(),
+    systemPromptBuilder: new SimplePromptBuilder(editor.value.state.doc.toString()),
     tools: [
-      new BrowserToolHandler(),
+      new GenerateOutlineToolHandler(),
     ],
   }
 
@@ -711,6 +716,19 @@ async function sendMessage() {
   if (!userMessage)
     return
 
+  const modelConfig = getModelConfig()
+  if (!modelConfig.agentModel || !modelConfig.agentModel.apiKey || !modelConfig.agentModel.baseUrl || !modelConfig.agentModel.modelName) {
+    const missingFields = []
+    if (!modelConfig.agentModel?.apiKey)
+      missingFields.push(`API Key`)
+    if (!modelConfig.agentModel?.baseUrl)
+      missingFields.push(`Base URL`)
+    if (!modelConfig.agentModel?.modelName)
+      missingFields.push(`Model Name`)
+    toast.error(`请先配置${missingFields.join(`、`)}`)
+    return
+  }
+
   input.value = ``
   historyIndex.value = null
 
@@ -731,37 +749,72 @@ async function sendMessage() {
   })
 
   loading.value = true
+
+  const taskId = currentTask.value?.id || nanoid()
+  if (!currentTask.value?.id) {
+    currentTask.value = { id: taskId, title: userMessage.substring(0, 50) }
+  }
+
+  console.log(`[sendMessage] Messages after push:`, messages.value)
+  console.log(`[sendMessage] Last message role:`, messages.value[messages.value.length - 1]?.role)
+
   fetchController.value = new AbortController()
 
   try {
     await startTaskWithStreaming(userMessage, (chunk) => {
-      const lastMessage = messages.value[messages.value.length - 1]
+      console.log(`[sendMessage] Streaming chunk:`, chunk)
+      console.log(`[sendMessage] Chunk type:`, chunk.type)
+      console.log(`[sendMessage] Chunk text:`, chunk.text)
+      console.log(`[sendMessage] Chunk reasoning:`, chunk.reasoning)
+      console.log(`[sendMessage] Messages length:`, messages.value.length)
+
+      const lastIndex = messages.value.length - 1
+      const lastMessage = messages.value[lastIndex]
+      console.log(`[sendMessage] Last message before update:`, lastMessage)
+      console.log(`[sendMessage] Last message role:`, lastMessage?.role)
+
       if (lastMessage?.role === `assistant`) {
-        if (chunk.content) {
-          const currentText = getTextFromContentBlocks(lastMessage.content)
-          lastMessage.content = createTextContentBlock(currentText + chunk.content)
+        if (chunk.type === `text` && chunk.text) {
+          const currentText = getTextFromContentBlocks(lastMessage.content || [])
+          console.log(`[sendMessage] Current text:`, currentText)
+          console.log(`[sendMessage] New text:`, currentText + chunk.text)
+
+          const newContent = createTextContentBlock(currentText + chunk.text)
+          console.log(`[sendMessage] New content blocks:`, newContent)
+
+          lastMessage.content = newContent
+          console.log(`[sendMessage] Last message after update:`, lastMessage)
+          console.log(`[sendMessage] Messages array last item:`, messages.value[lastIndex])
         }
-        if (chunk.reasoning) {
-          lastMessage.reasoning = chunk.reasoning
-        }
-        if (chunk.done !== undefined) {
-          lastMessage.done = chunk.done
+        else if (chunk.type === `reasoning` && chunk.reasoning) {
+          lastMessage.reasoning = (lastMessage.reasoning || ``) + chunk.reasoning
         }
         scrollToBottom()
       }
+      else {
+        console.log(`[sendMessage] ERROR: Last message is not assistant or is undefined!`)
+      }
     })
 
-    const lastMessage = messages.value[messages.value.length - 1]
+    const lastIndex = messages.value.length - 1
+    const lastMessage = messages.value[lastIndex]
     if (lastMessage?.role === `assistant`) {
-      lastMessage.done = true
+      messages.value[lastIndex] = {
+        ...lastMessage,
+        done: true,
+      }
     }
   }
   catch (error) {
     console.error(`[sendMessage] Error:`, error)
-    const lastMessage = messages.value[messages.value.length - 1]
+    const lastIndex = messages.value.length - 1
+    const lastMessage = messages.value[lastIndex]
     if (lastMessage?.role === `assistant`) {
-      lastMessage.content = createTextContentBlock(`抱歉，发生了错误：${error instanceof Error ? error.message : String(error)}`)
-      lastMessage.done = true
+      messages.value[lastIndex] = {
+        ...lastMessage,
+        content: createTextContentBlock(`抱歉，发生了错误：${error instanceof Error ? error.message : String(error)}`),
+        done: true,
+      }
     }
     toast.error(`发送消息失败`)
   }
@@ -781,6 +834,15 @@ async function sendMessage() {
         <h2 class="text-sm font-semibold">
           AI 助手
         </h2>
+        <Button
+          variant="ghost"
+          size="icon"
+          class="h-5 w-5"
+          title="新增对话"
+          @click="newConversation"
+        >
+          <Plus class="h-3.5 w-3.5" />
+        </Button>
       </div>
       <div class="flex items-center gap-1">
         <Button
