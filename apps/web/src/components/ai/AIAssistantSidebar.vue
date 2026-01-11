@@ -12,6 +12,7 @@ import {
   Image as ImageIcon,
   MessageCircle,
   Pause,
+  Plus,
   Send,
   Settings,
   Trash2,
@@ -393,6 +394,25 @@ function resetMessages() {
   scrollToBottom(true)
 }
 
+function newConversation() {
+  if (fetchController.value) {
+    fetchController.value.abort()
+    fetchController.value = null
+  }
+  messages.value = getDefaultMessages()
+  currentTask.value = null
+  input.value = ``
+  loading.value = false
+  try {
+    const cleanedMessages = cleanMessagesForStorage(messages.value)
+    localStorage.setItem(memoryKey, JSON.stringify(cleanedMessages))
+  }
+  catch (e) {
+    console.error(`[存储] 新增对话时保存失败:`, e)
+  }
+  scrollToBottom(true)
+}
+
 function pauseStreaming() {
   if (fetchController.value) {
     fetchController.value.abort()
@@ -711,6 +731,19 @@ async function sendMessage() {
   if (!userMessage)
     return
 
+  const modelConfig = getModelConfig()
+  if (!modelConfig.agentModel || !modelConfig.agentModel.apiKey || !modelConfig.agentModel.baseUrl || !modelConfig.agentModel.modelName) {
+    const missingFields = []
+    if (!modelConfig.agentModel?.apiKey)
+      missingFields.push(`API Key`)
+    if (!modelConfig.agentModel?.baseUrl)
+      missingFields.push(`Base URL`)
+    if (!modelConfig.agentModel?.modelName)
+      missingFields.push(`Model Name`)
+    toast.error(`请先配置${missingFields.join(`、`)}`)
+    return
+  }
+
   input.value = ``
   historyIndex.value = null
 
@@ -781,6 +814,15 @@ async function sendMessage() {
         <h2 class="text-sm font-semibold">
           AI 助手
         </h2>
+        <Button
+          variant="ghost"
+          size="icon"
+          class="h-5 w-5"
+          title="新增对话"
+          @click="newConversation"
+        >
+          <Plus class="h-3.5 w-3.5" />
+        </Button>
       </div>
       <div class="flex items-center gap-1">
         <Button

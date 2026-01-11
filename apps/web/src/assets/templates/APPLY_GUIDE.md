@@ -141,8 +141,8 @@ renderer = initRenderer({
       <SelectValue placeholder="选择标题模板" />
     </SelectTrigger>
     <SelectContent>
-      <SelectItem value="default">默认样式</SelectItem>
-      <SelectItem value="beautiful">精美样式模板</SelectItem>
+      <SelectItem value="default"> 默认样式 </SelectItem>
+      <SelectItem value="beautiful"> 精美样式模板 </SelectItem>
     </SelectContent>
   </Select>
 </template>
@@ -153,7 +153,7 @@ renderer = initRenderer({
 将用户选择保存到 localStorage：
 
 ```typescript
-const selectedTemplate = useStorage("heading_template", "default");
+const selectedTemplate = useStorage(`heading_template`, `default`);
 ```
 
 ### 步骤 3：根据选择应用模板
