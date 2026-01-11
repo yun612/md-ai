@@ -624,6 +624,21 @@ onMounted(() => {
     return
   }
 
+  // 暂时不需要强制切换，只支持html格式
+  // 检查当前内容，如果是 Markdown 格式的默认内容，强制切换到 Markdown 模式
+  // const currentPost = posts.value[currentPostIndex.value]
+  // if (currentPost?.content) {
+  //   // 如果内容以 # 开头或包含典型的 Markdown 语法，且当前是 HTML 模式，切换到 Markdown 模式
+  //   const isMarkdownContent = currentPost.content.startsWith(`#`)
+  //     || currentPost.content.includes(`## `)
+  //     || currentPost.content.includes(`### `)
+  //     || (currentPost.content.includes(`探索 Markdown`) && !currentPost.content.includes(`<html`))
+
+  //   if (isMarkdownContent && isHtmlMode.value) {
+  //     htmlEditorStore.switchToMarkdown()
+  //   }
+  // }
+
   // 初始化渲染器
   const cssContent = cssEditorStore.getCurrentTabContent()
   renderStore.initRendererInstance(

@@ -65,6 +65,24 @@ onMounted(() => {
     state: startState,
     parent: editorContainer.value,
   })
+
+  // 监听格式切换事件
+  const handleModeChange = (event: Event) => {
+    const customEvent = event as CustomEvent
+    const { mode, content } = customEvent.detail
+    if (mode === `html` && content && editorView) {
+      // 更新编辑器内容
+      editorView.dispatch({
+        changes: { from: 0, to: editorView.state.doc.length, insert: content },
+      })
+    }
+  }
+
+  window.addEventListener(`editor-mode-changed`, handleModeChange)
+
+  onUnmounted(() => {
+    window.removeEventListener(`editor-mode-changed`, handleModeChange)
+  })
 })
 
 watch(isDark, (newIsDark) => {
@@ -80,96 +98,9 @@ onUnmounted(() => {
 })
 
 function getDefaultHtmlTemplate(): string {
-  return `<!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="UTF-8">
-      <style>
-        /* 在这里定义你的 CSS 样式 */
-        .hero-section {
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-          padding: 40px;
-          border-radius: 15px;
-          color: white;
-          text-align: center;
-          box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-        }
-        
-        .hero-title {
-          font-size: 32px;
-          font-weight: bold;
-          margin: 0 0 10px 0;
-        }
-        
-        .hero-subtitle {
-          font-size: 18px;
-          opacity: 0.9;
-          margin: 0;
-        }
-        
-        .content-section {
-          padding: 20px;
-          margin: 20px 0;
-        }
-        
-        .feature-card {
-          display: inline-block;
-          width: 30%;
-          padding: 20px;
-          margin: 10px 1%;
-          background: #f8f9fa;
-          border-radius: 8px;
-          vertical-align: top;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        }
-        
-        .feature-title {
-          color: #667eea;
-          font-size: 20px;
-          font-weight: bold;
-          margin: 0 0 10px 0;
-        }
-        
-        .feature-text {
-          color: #333;
-          line-height: 1.6;
-          margin: 0;
-        }
-      </style>
-    </head>
-    <body>
-      <!-- Hero Section -->
-      <div class="hero-section">
-        <h1 class="hero-title">欢迎使用 HTML 编辑模式</h1>
-        <p class="hero-subtitle">自由发挥，创作更丰富的样式效果</p >
-      </div>
-      
-      <!-- Content Section -->
-      <div class="content-section">
-        <h2>功能特点</h2>
-        
-        <div class="feature-card">
-          <h3 class="feature-title">完全自定义</h3>
-          <p class="feature-text">使用 HTML + CSS 实现任何你想要的样式效果</p >
-        </div>
-        
-        <div class="feature-card">
-          <h3 class="feature-title">自动转换</h3>
-          <p class="feature-text">复制时会自动转换为行内样式，兼容微信公众号</p >
-        </div>
-        
-        <div class="feature-card">
-          <h3 class="feature-title">实时预览</h3>
-          <p class="feature-text">右侧实时预览效果，所见即所得</p >
-        </div>
-      </div>
-      
-      <div class="content-section">
-        <h2>开始创作吧！</h2>
-        <p>删除这些示例内容，开始编写你自己的 HTML + CSS 代码。</p >
-      </div>
-    </body>
-    </html>`
+  return `<section style="width:100%;display:inline-block;background:#e3f2fd;padding:20px;text-align:center;width:33%;box-sizing:border-box;">第一栏</section>
+<section style="width:100%;display:inline-block;background:#f3e5f5;padding:20px;text-align:center;width:33%;box-sizing:border-box;">第二栏</section>
+<section style="width:100%;display:inline-block;background:#ff0;padding:20px;text-align:center;width:34%;box-sizing:border-box;">第三栏</section>`
 }
 
 defineExpose({

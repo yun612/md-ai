@@ -78,6 +78,29 @@ function editorRefresh() {
   })
 }
 
+// 处理格式切换
+function handleModeChanged(mode: `markdown` | `html`, convertedContent?: string) {
+  if (convertedContent) {
+    if (mode === `html`) {
+      // Markdown 切换到 HTML，传递转换后的 HTML 内容
+      nextTick(() => {
+        // 触发编辑器更新事件
+        const event = new CustomEvent(`editor-mode-changed`, {
+          detail: { mode, content: convertedContent },
+        })
+        window.dispatchEvent(event)
+      })
+    }
+    else {
+      // HTML 切换到 Markdown，更新编辑器内容
+      editorStore.setContent(convertedContent)
+      nextTick(() => {
+        editorRefresh()
+      })
+    }
+  }
+}
+
 // 对话框状态
 const aboutDialogVisible = ref(false)
 const fundDialogVisible = ref(false)
@@ -336,7 +359,7 @@ async function copy() {
         <StyleDropdown />
         <HelpDropdown @open-about="handleOpenAbout" @open-fund="handleOpenFund" />
       </Menubar>
-      <HtmlEditorToolbar class="ml-2" />
+      <HtmlEditorToolbar class="ml-2" @mode-changed="handleModeChanged" />
     </div>
 
     <!-- 移动端汉堡菜单按钮 -->

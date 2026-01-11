@@ -31,7 +31,10 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.919.0",
     "@aws-sdk/s3-request-presigner": "^3.919.0",
+    "@codemirror/commands": "^6.10.0",
     "@codemirror/lang-html": "^6.4.11",
+    "@codemirror/state": "^6.5.2",
+    "@codemirror/view": "^6.36.8",
     "@exercism/highlightjs-gdscript": "^0.0.1",
     "@grisaiaevy/crafting-agent": "^0.0.8",
     "@md/core": "workspace:*",

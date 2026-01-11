@@ -1,6 +1,19 @@
 <script setup lang="ts">
 import imageCompression from 'browser-image-compression'
-import { Image, Palette, Sparkles, Type, X } from 'lucide-vue-next'
+import {
+  AlignCenter,
+  AlignLeft,
+  AlignRight,
+  Bold,
+  Highlighter,
+  Image,
+  Italic,
+  Palette,
+  Sparkles,
+  TypeOutline,
+  Underline,
+  X,
+} from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 import { useAIConfigStore } from '@/stores/aiConfig'
 import { toBase64 } from '@/utils'
@@ -162,8 +175,11 @@ function selectElement(element: HTMLElement) {
   if (!element.getAttribute(`data-element-id`)) {
     element.setAttribute(`data-element-id`, `element-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`)
   }
-  element.style.outline = `2px solid #3b82f6`
+  // 应用渐变高亮效果 - 只使用 outline 和 box-shadow，不影响背景色
+  element.style.outline = `2px solid rgba(59, 130, 246, 0.6)`
   element.style.outlineOffset = `2px`
+  element.style.boxShadow = `0 0 0 4px rgba(147, 51, 234, 0.2), inset 0 0 0 2px rgba(59, 130, 246, 0.1)`
+  element.style.transition = `all 0.3s ease-out`
   element.setAttribute(`data-selected`, `true`)
 }
 
@@ -171,6 +187,8 @@ function clearSelection() {
   if (selectedElement.value) {
     selectedElement.value.style.outline = ``
     selectedElement.value.style.outlineOffset = ``
+    selectedElement.value.style.boxShadow = ``
+    selectedElement.value.style.transition = ``
     selectedElement.value.removeAttribute(`data-selected`)
   }
   selectedElement.value = null
@@ -328,12 +346,46 @@ function handleChangeColor() {
   input.onchange = (e) => {
     const color = (e.target as HTMLInputElement).value
     applyStyle({ color })
-    toast.success(`颜色已修改为 ${color}`)
+    toast.success(`文字颜色已修改为 ${color}`)
   }
 
   input.oninput = (e) => {
     const color = (e.target as HTMLInputElement).value
     applyStyle({ color })
+  }
+
+  input.click()
+}
+
+function handleChangeBackgroundColor() {
+  contextMenuOpen.value = false
+  if (!selectedElement.value)
+    return
+
+  const input = document.createElement(`input`)
+  input.type = `color`
+
+  const currentBgColor = getComputedStyle(selectedElement.value).backgroundColor
+  if (currentBgColor && currentBgColor !== `rgba(0, 0, 0, 0)`) {
+    const rgb = currentBgColor.match(/\d+/g)
+    if (rgb && rgb.length >= 3) {
+      const hex = `#${rgb.map((x) => {
+        const hex = Number.parseInt(x).toString(16)
+        return hex.length === 1 ? `0${hex}` : hex
+      }).join(``)}`
+      input.value = hex
+    }
+  }
+
+  input.onchange = (e) => {
+    const color = (e.target as HTMLInputElement).value
+    applyStyle({ backgroundColor: color })
+    toast.success(`背景颜色已修改为 ${color}`)
+  }
+
+  input.oninput = (e) => {
+    const color = (e.target as HTMLInputElement).value
+    applyStyle({ backgroundColor: color })
   }
 
   input.click()
@@ -542,130 +594,172 @@ onUnmounted(() => {
       class="html-preview-panel html-preview-content h-full overflow-y-auto bg-background relative p-4 w-full"
     />
     <Teleport to="body">
-      <div
-        v-if="contextMenuOpen"
-        class="custom-context-menu fixed z-[200] min-w-32 overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
-        :style="{
-          left: `${contextMenuPosition.x}px`,
-          top: `${contextMenuPosition.y}px`,
-          transform: 'translateX(-50%)',
-        }"
-        @click.stop
-        @contextmenu.prevent.stop
+      <Transition
+        enter-active-class="transition-all duration-200 ease-out"
+        enter-from-class="opacity-0 scale-90 -translate-y-2"
+        enter-to-class="opacity-100 scale-100 translate-y-0"
+        leave-active-class="transition-all duration-150 ease-in"
+        leave-from-class="opacity-100 scale-100 translate-y-0"
+        leave-to-class="opacity-0 scale-90 -translate-y-2"
       >
         <div
-          class="relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-hidden focus:bg-accent focus:text-accent-foreground hover:bg-accent"
-          @click="handleAddBackgroundImage"
+          v-if="contextMenuOpen"
+          class="floating-style-toolbar fixed z-[200]"
+          :style="{
+            left: `${contextMenuPosition.x}px`,
+            top: `${contextMenuPosition.y}px`,
+            transform: 'translateX(-50%)',
+          }"
+          @click.stop
+          @contextmenu.prevent.stop
         >
-          <Image class="mr-2 h-4 w-4" />
-          添加背景图
+          <!-- 基础样式组 -->
+          <div class="toolbar-group">
+            <button
+              class="toolbar-btn"
+              title="加粗"
+              @click="handleChangeTextStyle('bold')"
+            >
+              <Bold :size="20" />
+            </button>
+            <button
+              class="toolbar-btn"
+              title="斜体"
+              @click="handleChangeTextStyle('italic')"
+            >
+              <Italic :size="20" />
+            </button>
+            <button
+              class="toolbar-btn"
+              title="下划线"
+              @click="handleChangeTextStyle('underline')"
+            >
+              <Underline :size="20" />
+            </button>
+          </div>
+
+          <div class="toolbar-divider" />
+
+          <!-- 格式组 -->
+          <div class="toolbar-group">
+            <button
+              class="toolbar-btn"
+              title="改为标题1"
+              @click="handleChangeToHeading(1)"
+            >
+              <span class="text-xs font-semibold">H1</span>
+            </button>
+            <button
+              class="toolbar-btn"
+              title="改为标题2"
+              @click="handleChangeToHeading(2)"
+            >
+              <span class="text-xs font-semibold">H2</span>
+            </button>
+            <button
+              class="toolbar-btn"
+              title="改为标题3"
+              @click="handleChangeToHeading(3)"
+            >
+              <span class="text-xs font-semibold">H3</span>
+            </button>
+          </div>
+
+          <div class="toolbar-divider" />
+
+          <!-- 字号组 -->
+          <div class="toolbar-group">
+            <button
+              class="toolbar-btn"
+              title="增大字号"
+              @click="handleChangeTextStyle('large')"
+            >
+              <TypeOutline :size="20" class="scale-125" />
+            </button>
+            <button
+              class="toolbar-btn"
+              title="减小字号"
+              @click="handleChangeTextStyle('small')"
+            >
+              <TypeOutline :size="20" class="scale-75" />
+            </button>
+          </div>
+
+          <div class="toolbar-divider" />
+
+          <!-- 对齐组 -->
+          <div class="toolbar-group">
+            <button
+              class="toolbar-btn"
+              title="左对齐"
+              @click="handleChangeTextStyle('left')"
+            >
+              <AlignLeft :size="20" />
+            </button>
+            <button
+              class="toolbar-btn"
+              title="居中"
+              @click="handleChangeTextStyle('center')"
+            >
+              <AlignCenter :size="20" />
+            </button>
+            <button
+              class="toolbar-btn"
+              title="右对齐"
+              @click="handleChangeTextStyle('right')"
+            >
+              <AlignRight :size="20" />
+            </button>
+          </div>
+
+          <div class="toolbar-divider" />
+
+          <!-- 颜色和样式组 -->
+          <div class="toolbar-group">
+            <button
+              class="toolbar-btn"
+              title="文字颜色"
+              @click="handleChangeColor"
+            >
+              <Palette :size="20" />
+            </button>
+            <button
+              class="toolbar-btn"
+              title="背景颜色"
+              @click="handleChangeBackgroundColor"
+            >
+              <Highlighter :size="20" />
+            </button>
+            <button
+              class="toolbar-btn"
+              title="添加背景图"
+              @click="handleAddBackgroundImage"
+            >
+              <Image :size="20" />
+            </button>
+          </div>
+
+          <div class="toolbar-divider" />
+
+          <!-- AI 和其他组 -->
+          <div class="toolbar-group">
+            <button
+              class="toolbar-btn toolbar-btn-primary"
+              title="AI 修改"
+              @click="handleOpenAiChat"
+            >
+              <Sparkles :size="20" />
+            </button>
+            <button
+              class="toolbar-btn toolbar-btn-danger"
+              title="移除样式"
+              @click="handleRemoveStyle"
+            >
+              <X :size="20" />
+            </button>
+          </div>
         </div>
-        <div class="-mx-1 my-1 h-px bg-border" />
-        <div
-          class="relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-hidden focus:bg-accent focus:text-accent-foreground hover:bg-accent"
-          @click="handleChangeToHeading(1)"
-        >
-          <Type class="mr-2 h-4 w-4" />
-          改为标题1
-        </div>
-        <div
-          class="relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-hidden focus:bg-accent focus:text-accent-foreground hover:bg-accent"
-          @click="handleChangeToHeading(2)"
-        >
-          <Type class="mr-2 h-4 w-4" />
-          改为标题2
-        </div>
-        <div
-          class="relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-hidden focus:bg-accent focus:text-accent-foreground hover:bg-accent"
-          @click="handleChangeToHeading(3)"
-        >
-          <Type class="mr-2 h-4 w-4" />
-          改为标题3
-        </div>
-        <div class="-mx-1 my-1 h-px bg-border" />
-        <div
-          class="relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-hidden focus:bg-accent focus:text-accent-foreground hover:bg-accent"
-          @click="handleChangeTextStyle('bold')"
-        >
-          <Type class="mr-2 h-4 w-4" />
-          加粗
-        </div>
-        <div
-          class="relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-hidden focus:bg-accent focus:text-accent-foreground hover:bg-accent"
-          @click="handleChangeTextStyle('italic')"
-        >
-          <Type class="mr-2 h-4 w-4" />
-          斜体
-        </div>
-        <div
-          class="relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-hidden focus:bg-accent focus:text-accent-foreground hover:bg-accent"
-          @click="handleChangeTextStyle('underline')"
-        >
-          <Type class="mr-2 h-4 w-4" />
-          下划线
-        </div>
-        <div class="-mx-1 my-1 h-px bg-border" />
-        <div
-          class="relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-hidden focus:bg-accent focus:text-accent-foreground hover:bg-accent"
-          @click="handleChangeTextStyle('large')"
-        >
-          <Type class="mr-2 h-4 w-4" />
-          增大字号
-        </div>
-        <div
-          class="relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-hidden focus:bg-accent focus:text-accent-foreground hover:bg-accent"
-          @click="handleChangeTextStyle('small')"
-        >
-          <Type class="mr-2 h-4 w-4" />
-          减小字号
-        </div>
-        <div class="-mx-1 my-1 h-px bg-border" />
-        <div
-          class="relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-hidden focus:bg-accent focus:text-accent-foreground hover:bg-accent"
-          @click="handleChangeTextStyle('center')"
-        >
-          <Type class="mr-2 h-4 w-4" />
-          居中
-        </div>
-        <div
-          class="relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-hidden focus:bg-accent focus:text-accent-foreground hover:bg-accent"
-          @click="handleChangeTextStyle('left')"
-        >
-          <Type class="mr-2 h-4 w-4" />
-          左对齐
-        </div>
-        <div
-          class="relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-hidden focus:bg-accent focus:text-accent-foreground hover:bg-accent"
-          @click="handleChangeTextStyle('right')"
-        >
-          <Type class="mr-2 h-4 w-4" />
-          右对齐
-        </div>
-        <div class="-mx-1 my-1 h-px bg-border" />
-        <div
-          class="relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-hidden focus:bg-accent focus:text-accent-foreground hover:bg-accent"
-          @click="handleChangeColor"
-        >
-          <Palette class="mr-2 h-4 w-4" />
-          改变颜色
-        </div>
-        <div class="-mx-1 my-1 h-px bg-border" />
-        <div
-          class="relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-hidden focus:bg-accent focus:text-accent-foreground hover:bg-accent"
-          @click="handleRemoveStyle"
-        >
-          <X class="mr-2 h-4 w-4" />
-          移除样式
-        </div>
-        <div class="-mx-1 my-1 h-px bg-border" />
-        <div
-          class="relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-hidden focus:bg-accent focus:text-accent-foreground hover:bg-accent"
-          @click="handleOpenAiChat"
-        >
-          <Sparkles class="mr-2 h-4 w-4" />
-          AI 修改
-        </div>
-      </div>
+      </Transition>
     </Teleport>
     <Teleport to="body">
       <div
@@ -705,7 +799,7 @@ onUnmounted(() => {
 </template>
 
     <style scoped>
-    .html-preview-panel {
+.html-preview-panel {
   font-family:
     -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans',
     'Helvetica Neue', sans-serif;
@@ -730,6 +824,160 @@ onUnmounted(() => {
 
 .html-preview-content :deep(code) {
   font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+}
+
+/* 浮动工具栏样式 */
+.floating-style-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 12px;
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.12),
+    0 2px 6px rgba(0, 0, 0, 0.08);
+  pointer-events: auto;
+  user-select: none;
+}
+
+/* 深色模式 */
+@media (prefers-color-scheme: dark) {
+  .floating-style-toolbar {
+    background: rgba(26, 26, 26, 0.95);
+    border-color: rgba(255, 255, 255, 0.12);
+    box-shadow:
+      0 8px 24px rgba(0, 0, 0, 0.4),
+      0 2px 6px rgba(0, 0, 0, 0.3);
+  }
+}
+
+/* 工具栏分组 */
+.toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* 分隔线 */
+.toolbar-divider {
+  width: 1px;
+  height: 24px;
+  background: rgba(0, 0, 0, 0.1);
+  margin: 0 4px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .toolbar-divider {
+    background: rgba(255, 255, 255, 0.1);
+  }
+}
+
+/* 工具栏按钮 */
+.toolbar-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  color: rgba(0, 0, 0, 0.7);
+  transition: all 0.2s ease-out;
+  position: relative;
+  overflow: hidden;
+}
+
+.toolbar-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 8px;
+  opacity: 0;
+  transition: opacity 0.2s ease-out;
+}
+
+.toolbar-btn:hover {
+  color: rgba(0, 0, 0, 0.9);
+  transform: scale(1.05);
+}
+
+.toolbar-btn:hover::before {
+  opacity: 1;
+}
+
+.toolbar-btn:active {
+  transform: scale(0.95);
+}
+
+/* 深色模式按钮 */
+@media (prefers-color-scheme: dark) {
+  .toolbar-btn {
+    color: rgba(255, 255, 255, 0.7);
+  }
+
+  .toolbar-btn::before {
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  .toolbar-btn:hover {
+    color: rgba(255, 255, 255, 0.95);
+  }
+}
+
+/* 主要按钮样式 (AI按钮) */
+.toolbar-btn-primary {
+  color: #8b5cf6;
+}
+
+.toolbar-btn-primary::before {
+  background: rgba(139, 92, 246, 0.1);
+}
+
+.toolbar-btn-primary:hover {
+  color: #7c3aed;
+}
+
+/* 危险按钮样式 (移除样式) */
+.toolbar-btn-danger {
+  color: #ef4444;
+}
+
+.toolbar-btn-danger::before {
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.toolbar-btn-danger:hover {
+  color: #dc2626;
+}
+
+/* 选中元素的动画效果 */
+:deep([data-selected='true']) {
+  animation: pulseHighlight 2s ease-in-out infinite;
+}
+
+@keyframes pulseHighlight {
+  0%,
+  100% {
+    outline: 2px solid rgba(59, 130, 246, 0.6);
+    outline-offset: 2px;
+    box-shadow:
+      0 0 0 4px rgba(147, 51, 234, 0.2),
+      inset 0 0 0 2px rgba(59, 130, 246, 0.1);
+  }
+  50% {
+    outline: 2px solid rgba(59, 130, 246, 0.8);
+    outline-offset: 2px;
+    box-shadow:
+      0 0 0 4px rgba(147, 51, 234, 0.4),
+      inset 0 0 0 2px rgba(59, 130, 246, 0.2);
+  }
 }
 </style>
 

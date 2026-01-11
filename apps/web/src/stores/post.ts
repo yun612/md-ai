@@ -1,6 +1,10 @@
 import { v4 as uuid } from 'uuid'
-import DEFAULT_CONTENT from '@/assets/example/markdown.md?raw'
 import { addPrefix } from '@/utils'
+
+// 默认 HTML 内容
+const DEFAULT_HTML_CONTENT = `<section style="width:100%;display:inline-block;background:#e3f2fd;padding:20px;text-align:center;width:33%;box-sizing:border-box;">第一栏</section>
+<section style="width:100%;display:inline-block;background:#f3e5f5;padding:20px;text-align:center;width:33%;box-sizing:border-box;">第二栏</section>
+<section style="width:100%;display:inline-block;background:#ff0;padding:20px;text-align:center;width:34%;box-sizing:border-box;">第三栏</section>`
 
 /**
  * Post 结构接口
@@ -57,9 +61,9 @@ export const usePostStore = defineStore(`post`, () => {
     {
       id: uuid(),
       title: `内容1`,
-      content: DEFAULT_CONTENT,
+      content: DEFAULT_HTML_CONTENT,
       history: [
-        { datetime: new Date().toLocaleString(`zh-cn`), content: DEFAULT_CONTENT },
+        { datetime: new Date().toLocaleString(`zh-cn`), content: DEFAULT_HTML_CONTENT },
       ],
       createDatetime: new Date(),
       updateDatetime: new Date(),
@@ -98,7 +102,7 @@ export const usePostStore = defineStore(`post`, () => {
   })
 
   // 预备弃用的旧字段（用于迁移）
-  const editorContent = ref<string>(safeGetStorage(`__editor_content`, DEFAULT_CONTENT))
+  const editorContent = ref<string>(safeGetStorage(`__editor_content`, DEFAULT_HTML_CONTENT))
   watch(editorContent, (newValue) => {
     try {
       localStorage.setItem(`__editor_content`, newValue)
@@ -219,12 +223,12 @@ export const usePostStore = defineStore(`post`, () => {
 
   // 迁移阶段，兼容之前的方案
   onMounted(() => {
-    if (editorContent.value !== DEFAULT_CONTENT) {
+    if (editorContent.value !== DEFAULT_HTML_CONTENT) {
       const post = getPostById(currentPostId.value)
       if (post) {
         post.content = editorContent.value
       }
-      editorContent.value = DEFAULT_CONTENT
+      editorContent.value = DEFAULT_HTML_CONTENT
     }
   })
 
