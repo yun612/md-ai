@@ -20,7 +20,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Textarea } from '@/components/ui/textarea'
-import useAIConfigStore from '@/stores/aiConfig'
+import { useAIConfigStore } from '@/stores/aiConfig'
 import { useDisplayStore } from '@/stores/display'
 import { useEditorStore } from '@/stores/editor'
 import { copyPlain } from '@/utils/clipboard'

@@ -26,7 +26,7 @@ import MessageBlock from '@/components/ai/chat-box/MessageBlock.vue'
 import OutlineEditor from '@/components/OutlineEditor.vue'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
-import useAIConfigStore from '@/stores/aiConfig'
+import { useAIConfigStore } from '@/stores/aiConfig'
 import { useDisplayStore } from '@/stores/display'
 import { useEditorStore } from '@/stores/editor'
 import { useProjectStore } from '@/stores/project'
@@ -670,7 +670,7 @@ async function startTaskWithStreaming(
     modelConfig,
     variables: {
     },
-    systemPromptBuilder: new SimplePromptBuilder(editor.value.state.doc.toString()),
+    systemPromptBuilder: new SimplePromptBuilder(editor?.value?.state.doc.toString() || ``),
     tools: [
       new GenerateOutlineToolHandler(),
     ],
@@ -762,7 +762,7 @@ async function sendMessage() {
 
   try {
     await startTaskWithStreaming(userMessage, (chunk) => {
-      console.log(`[sendMessage] Streaming chunk:`, chunk)
+      console.log(chunk)
       console.log(`[sendMessage] Chunk type:`, chunk.type)
       console.log(`[sendMessage] Chunk text:`, chunk.text)
       console.log(`[sendMessage] Chunk reasoning:`, chunk.reasoning)
@@ -788,6 +788,22 @@ async function sendMessage() {
         }
         else if (chunk.type === `reasoning` && chunk.reasoning) {
           lastMessage.reasoning = (lastMessage.reasoning || ``) + chunk.reasoning
+        }
+        else if (chunk.type === `tool_calls` && chunk.tool_call) {
+          console.log(`[sendMessage] Tool call:`, chunk.tool_call)
+          const toolCallBlock: ContentBlock = {
+            type: `tool_use`,
+            tool_use_id: chunk.tool_call.function.id,
+            name: chunk.tool_call.function.name,
+            input: chunk.tool_call.function.arguments,
+          }
+          if (Array.isArray(lastMessage.content)) {
+            lastMessage.content.push(toolCallBlock)
+          }
+          else {
+            lastMessage.content = [toolCallBlock]
+          }
+          console.log(`[sendMessage] Last message after tool call:`, lastMessage)
         }
         scrollToBottom()
       }

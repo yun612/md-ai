@@ -15,7 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import useAIConfigStore from '@/stores/aiConfig'
+import { useAIConfigStore } from '@/stores/aiConfig'
 import { useEditorStore } from '@/stores/editor'
 
 /* -------------------- props / emits -------------------- */

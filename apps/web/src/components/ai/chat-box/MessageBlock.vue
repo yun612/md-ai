@@ -102,6 +102,18 @@ function handleApplyImage(img: { url?: string, base64?: string, prompt?: string 
 function handleDownloadImage(base64: string, filename: string) {
   emit(`downloadImage`, base64, filename)
 }
+
+function getToolUseBlocks(content: ContentBlock[]): ContentBlock[] {
+  if (!content || !Array.isArray(content))
+    return []
+  return content.filter(block => block.type === `tool_use`)
+}
+
+function getTextBlocks(content: ContentBlock[]): ContentBlock[] {
+  if (!content || !Array.isArray(content))
+    return []
+  return content.filter(block => block.type === `text` && block.text)
+}
 </script>
 
 <template>
@@ -121,9 +133,9 @@ function handleDownloadImage(base64: string, filename: string) {
       <!-- 内容 -->
       <template v-if="msg.role === 'assistant'">
         <div
-          v-if="getTextFromContentBlocks(msg.content || [])"
+          v-if="getTextBlocks(msg.content || []).length > 0"
           class="break-words markdown-content"
-          v-html="renderMarkdown(getTextFromContentBlocks(msg.content || []))"
+          v-html="renderMarkdown(getTextFromContentBlocks(getTextBlocks(msg.content || [])))"
         />
         <div
           v-else-if="!msg.done"
@@ -133,6 +145,28 @@ function handleDownloadImage(base64: string, filename: string) {
         </div>
         <div v-else class="text-xs opacity-50">
           (无内容)
+        </div>
+        <div v-if="getToolUseBlocks(msg.content || []).length > 0" class="mt-3 pt-2 border-t border-border/30">
+          <div class="text-xs font-medium opacity-70 mb-2">
+            工具调用：
+          </div>
+          <div class="space-y-2">
+            <div
+              v-for="(toolBlock, toolIndex) in getToolUseBlocks(msg.content || [])"
+              :key="toolIndex"
+              class="border border-border/50 rounded-md p-2 bg-muted/30"
+            >
+              <div class="flex items-center gap-2 mb-1.5">
+                <div class="text-xs font-medium text-primary">
+                  {{ toolBlock.name }}
+                </div>
+                <span class="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary">
+                  {{ toolBlock.tool_use_id?.slice(0, 8) || '未知' }}...
+                </span>
+              </div>
+              <pre v-if="toolBlock.input" class="text-xs bg-muted/50 p-2 rounded overflow-x-auto">{{ JSON.stringify(toolBlock.input, null, 2) }}</pre>
+            </div>
+          </div>
         </div>
       </template>
       <div

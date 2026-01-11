@@ -1,6 +1,12 @@
 import type { TaskContext, ToolHandler } from '@grisaiaevy/crafting-agent'
 
 export class GenerateOutlineToolHandler implements ToolHandler {
+  getConfig() {
+    return {
+      humanInLoop: true,
+    }
+  }
+
   tool() {
     return {
       type: `function` as const,
