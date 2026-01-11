@@ -169,7 +169,7 @@ export class IndexedDBTaskStorage extends TaskStorage {
     return await this.db.chatMessages
       .where(`taskId`)
       .equals(taskId)
-      .sortBy(`conversationRound`)
+      .sortBy(`createdAt`)
   }
 
   private generateId(): string {

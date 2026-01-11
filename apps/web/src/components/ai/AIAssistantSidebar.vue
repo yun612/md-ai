@@ -31,7 +31,7 @@ import { useDisplayStore } from '@/stores/display'
 import { useEditorStore } from '@/stores/editor'
 import { useProjectStore } from '@/stores/project'
 import { copyPlain } from '@/utils/clipboard'
-import { SimplePromptBuilder } from '../../agents/index'
+import { GenerateOutlineToolHandler, SimplePromptBuilder } from '../../agents/index'
 
 const editorStore = useEditorStore()
 const { editor } = storeToRefs(editorStore)
@@ -181,7 +181,7 @@ async function loadTasks() {
 async function loadChatMessages(taskId: string) {
   const storage = new IndexedDBTaskStorage()
   const chatMessages = await storage.getChatMessagesByTaskId(taskId)
-
+  console.log(`[AIAssistantSidebar] Loaded chat messages:`, chatMessages)
   messages.value = chatMessages.map((msg: any) => ({
     id: msg.id,
     projectId: msg.projectId,
@@ -670,9 +670,9 @@ async function startTaskWithStreaming(
     modelConfig,
     variables: {
     },
-    systemPromptBuilder: new SimplePromptBuilder(),
+    systemPromptBuilder: new SimplePromptBuilder(editor.value.state.doc.toString()),
     tools: [
-      // new BrowserToolHandler(),
+      new GenerateOutlineToolHandler(),
     ],
   }
 
