@@ -113,15 +113,24 @@ importers:
       "@aws-sdk/s3-request-presigner":
         specifier: ^3.919.0
         version: 3.919.0
+      "@codemirror/commands":
+        specifier: ^6.10.0
+        version: 6.10.0
       "@codemirror/lang-html":
         specifier: ^6.4.11
         version: 6.4.11
+      "@codemirror/state":
+        specifier: ^6.5.2
+        version: 6.5.2
+      "@codemirror/view":
+        specifier: ^6.36.8
+        version: 6.38.6(patch_hash=10a27bce72005fc363ac7d248fad1a4807b4174ef909258776cd237c079ce364)
       "@exercism/highlightjs-gdscript":
         specifier: ^0.0.1
         version: 0.0.1
       "@grisaiaevy/crafting-agent":
-        specifier: ^0.1.2
-        version: 0.1.2(ws@8.18.3)
+        specifier: ^0.1.3
+        version: 0.1.3(ws@8.18.3)
       "@md/core":
         specifier: workspace:*
         version: link:../../packages/core
@@ -1466,12 +1475,6 @@ packages:
         integrity: sha512-2xUIc5mHXQzT16JnyOFkh8PvfeXuIut3pslWGfsGOhxP/lpgRm9HOl/mpzLErgt5mXDovqA0d11P21gofRLb9w==,
       }
 
-  "@codemirror/commands@6.9.0":
-    resolution:
-      {
-        integrity: sha512-454TVgjhO6cMufsyyGN70rGIfJxJEjcqjBG2x2Y03Y/+Fm99d3O/Kv1QDYWuG6hvxsgmjXmBuATikIIYvERX+w==,
-      }
-
   "@codemirror/lang-angular@0.1.4":
     resolution:
       {
@@ -2661,10 +2664,10 @@ packages:
       "@modelcontextprotocol/sdk":
         optional: true
 
-  "@grisaiaevy/crafting-agent@0.1.2":
+  "@grisaiaevy/crafting-agent@0.1.3":
     resolution:
       {
-        integrity: sha512-mBshWZwuugyt7fFSbrMB55RlzGDFohQOVNsYXGsgiETN2ezqA/eWCDnxqRUhwN7ckxSLhqA4SQfgi2VJLc8UvA==,
+        integrity: sha512-FcklA7yLh6UcZlQm2zBfG8ZDlIXV8nj5lOfSlQ2wqntw2t0OszVbTucn64GINyZnD3nhVHPxPzyaymCchBj4qw==,
       }
 
   "@humanfs/core@0.19.1":
@@ -17829,13 +17832,6 @@ snapshots:
       "@codemirror/view": 6.38.6(patch_hash=10a27bce72005fc363ac7d248fad1a4807b4174ef909258776cd237c079ce364)
       "@lezer/common": 1.2.3
 
-  "@codemirror/commands@6.9.0":
-    dependencies:
-      "@codemirror/language": 6.11.3
-      "@codemirror/state": 6.5.2
-      "@codemirror/view": 6.38.6(patch_hash=10a27bce72005fc363ac7d248fad1a4807b4174ef909258776cd237c079ce364)
-      "@lezer/common": 1.2.3
-
   "@codemirror/lang-angular@0.1.4":
     dependencies:
       "@codemirror/lang-html": 6.4.11
@@ -18521,7 +18517,7 @@ snapshots:
       - supports-color
       - utf-8-validate
 
-  "@grisaiaevy/crafting-agent@0.1.2(ws@8.18.3)":
+  "@grisaiaevy/crafting-agent@0.1.3(ws@8.18.3)":
     dependencies:
       "@anthropic-ai/sdk": 0.65.0(zod@3.25.76)
       "@google/genai": 1.35.0
@@ -21650,7 +21646,7 @@ snapshots:
   codemirror@6.0.2:
     dependencies:
       "@codemirror/autocomplete": 6.19.0
-      "@codemirror/commands": 6.9.0
+      "@codemirror/commands": 6.10.0
       "@codemirror/language": 6.11.3
       "@codemirror/lint": 6.9.0
       "@codemirror/search": 6.5.11

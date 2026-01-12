@@ -36,7 +36,7 @@
     "@codemirror/state": "^6.5.2",
     "@codemirror/view": "^6.36.8",
     "@exercism/highlightjs-gdscript": "^0.0.1",
-    "@grisaiaevy/crafting-agent": "^0.1.2",
+    "@grisaiaevy/crafting-agent": "^0.1.3",
     "@md/core": "workspace:*",
     "@md/shared": "workspace:*",
     "@mendable/firecrawl-js": "^1.29.3",
