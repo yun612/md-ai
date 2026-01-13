@@ -19,6 +19,7 @@ import {
 } from 'lucide-vue-next'
 
 import { nanoid } from 'nanoid'
+import { parse } from 'partial-json'
 import { toast } from 'vue-sonner'
 import { IndexedDBTaskStorage } from '@/agents/indexeddb_storage'
 import AIConfig from '@/components/ai/chat-box/AIConfig.vue'
@@ -31,10 +32,31 @@ import { useDisplayStore } from '@/stores/display'
 import { useEditorStore } from '@/stores/editor'
 import { useProjectStore } from '@/stores/project'
 import { copyPlain } from '@/utils/clipboard'
-import { GenerateOutlineToolHandler, SimplePromptBuilder } from '../../agents/index'
+import { SimplePromptBuilder, WriteArticleToolHandler } from '../../agents/index'
 
 const editorStore = useEditorStore()
 const { editor } = storeToRefs(editorStore)
+
+/* ---------- 待写入编辑器的文章内容 ---------- */
+const pendingArticleContent = ref<string | null>(null)
+
+/* ---------- 监听编辑器初始化，自动写入待定内容 ---------- */
+watch(editor, (newEditor) => {
+  if (newEditor && pendingArticleContent.value) {
+    console.log(`[write_artical] 编辑器已就绪，写入待定内容`)
+    const content = pendingArticleContent.value
+    pendingArticleContent.value = null
+    newEditor.dispatch({
+      changes: {
+        from: 0,
+        to: newEditor.state.doc.length,
+        insert: content,
+      },
+      selection: { anchor: content.length },
+    })
+    console.log(`[write_artical] 文章内容已替换到编辑器`)
+  }
+}, { immediate: true })
 const displayStore = useDisplayStore()
 const { toggleAIImageDialog } = displayStore
 
@@ -672,7 +694,8 @@ async function startTaskWithStreaming(
     },
     systemPromptBuilder: new SimplePromptBuilder(editor?.value?.state.doc.toString() || ``),
     tools: [
-      new GenerateOutlineToolHandler(),
+      // new GenerateOutlineToolHandler(),
+      new WriteArticleToolHandler(),
     ],
   }
 
@@ -761,6 +784,8 @@ async function sendMessage() {
   fetchController.value = new AbortController()
 
   try {
+    let toolName = ``
+    let toolArguments = ``
     await startTaskWithStreaming(userMessage, (chunk) => {
       console.log(chunk)
       console.log(`[sendMessage] Chunk type:`, chunk.type)
@@ -797,6 +822,47 @@ async function sendMessage() {
             name: chunk.tool_call.function.name,
             input: chunk.tool_call.function.arguments,
           }
+          if (toolCallBlock.name) {
+            toolName = toolCallBlock.name
+          }
+          if (toolCallBlock.input) {
+            toolArguments += toolCallBlock.input
+          }
+
+          if (toolName === `write_article`) {
+            if (!toolArguments) {
+              return
+            }
+            console.log(`[sendMessage] Tool arguments:`, toolArguments)
+            const repaired = parse(toolArguments)
+            console.log(`[repaired]: `, repaired)
+            const articleContent = repaired.content || ``
+            console.log(`[articleContent]: `, articleContent)
+
+            if (editor.value && articleContent) {
+              editor.value.dispatch({
+                changes: {
+                  from: 0,
+                  to: editor.value.state.doc.length,
+                  insert: articleContent,
+                },
+                selection: { anchor: articleContent.length },
+              })
+
+              console.log(`[write_artical] 文章内容已替换到编辑器`)
+            }
+            else if (articleContent) {
+              console.log(`[write_artical] 编辑器未就绪，保存待写入内容`)
+              pendingArticleContent.value = articleContent
+            }
+            else {
+              console.log(`[write_artical] 未写入编辑器:`, {
+                editorExists: !!editor.value,
+                contentLength: articleContent?.length,
+              })
+            }
+          }
+
           if (Array.isArray(lastMessage.content)) {
             lastMessage.content.push(toolCallBlock)
           }
