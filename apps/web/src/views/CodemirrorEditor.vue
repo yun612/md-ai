@@ -5,13 +5,15 @@ import { Compartment, EditorState } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
 import { highlightPendingBlocks, hljs } from '@md/core'
 import { themeMap } from '@md/shared/configs'
-import { markdownSetup, theme, truncateBase64Images } from '@md/shared/editor'
+import { theme as codeMirrorTheme, markdownSetup, truncateBase64Images } from '@md/shared/editor'
 import imageCompression from 'browser-image-compression'
-import { Eye, Pen } from 'lucide-vue-next'
+import { Eye, Palette, Pen } from 'lucide-vue-next'
 import { SidebarAIToolbar } from '@/components/ai'
 import AIAssistantSidebar from '@/components/ai/AIAssistantSidebar.vue'
 import { HtmlEditorView, HtmlPreviewPanel, useHtmlEditorStore } from '@/components/editor/html-editor'
+import TemplateGallery from '@/components/editor/TemplateGallery.vue'
 
+import { Button } from '@/components/ui/button'
 import {
   ResizableHandle,
   ResizablePanel,
@@ -41,7 +43,7 @@ const { editor } = storeToRefs(editorStore)
 const { output } = storeToRefs(renderStore)
 const { isDark } = storeToRefs(uiStore)
 const { posts, currentPostIndex } = storeToRefs(postStore)
-const { previewWidth } = storeToRefs(themeStore)
+const { previewWidth, theme } = storeToRefs(themeStore)
 const { isHtmlMode, htmlContent } = storeToRefs(htmlEditorStore)
 
 const {
@@ -65,6 +67,7 @@ function editorRefresh() {
     raw = htmlEditorStore.htmlContent
   }
   else {
+    ensureRenderer()
     raw = editorStore.getContent()
   }
   renderStore.render(raw, {
@@ -119,6 +122,156 @@ function endCopy() {
 }
 
 const showEditor = ref(true)
+const showTemplateGallery = ref(false)
+
+interface TemplateApplyPayload {
+  themeKey: keyof typeof themeMap
+  primaryColor: string
+  name: string
+}
+
+const htmlTemplates: Partial<Record<TemplateApplyPayload[`themeKey`], (content: string) => string>> = {
+  aurora: content => `
+    <style>
+      .tpl-aurora { background: linear-gradient(145deg, rgba(99,179,237,0.08), rgba(123,97,255,0.08)); padding: 16px; border-radius: 16px; }
+      .tpl-aurora-inner { background: #fff; border-radius: 14px; padding: 18px; box-shadow: 0 14px 32px rgba(62,118,244,0.16); }
+      .tpl-aurora-inner h1, .tpl-aurora-inner h2, .tpl-aurora-inner h3, .tpl-aurora-inner h4 { color: #0f172a; }
+      .tpl-aurora-inner p { color: #0f172a; line-height: 1.8; }
+      .tpl-aurora-inner code { background: rgba(15,23,42,0.12); padding: 3px 6px; border-radius: 6px; }
+      .tpl-aurora-inner pre { background: #0f172a; color: #e2e8f0; border-radius: 12px; padding: 12px; }
+    </style>
+    <div class="tpl-aurora">
+      <div class="tpl-aurora-inner">
+        ${content || `<p>在这里添加你的内容</p>`}
+      </div>
+    </div>
+  `,
+  notebook: content => `
+    <style>
+      .tpl-notebook { background: #f9f4ec; padding: 16px; border-radius: 18px; }
+      .tpl-notebook-inner { background: #fdfaf3; border: 1px solid rgba(196,122,68,0.16); box-shadow: 0 14px 28px rgba(201,164,116,0.14); border-radius: 14px; padding: 18px; }
+      .tpl-notebook-inner h1, .tpl-notebook-inner h2, .tpl-notebook-inner h3, .tpl-notebook-inner h4 { color: #5b3b1a; }
+      .tpl-notebook-inner p { color: #3b2f26; line-height: 1.8; }
+      .tpl-notebook-inner code { background: rgba(196,122,68,0.14); padding: 3px 6px; border-radius: 6px; color: #5b3b1a; }
+      .tpl-notebook-inner pre { background: #111827; color: #fef9ee; border-radius: 12px; padding: 12px; }
+    </style>
+    <div class="tpl-notebook">
+      <div class="tpl-notebook-inner">
+        ${content || `<p>在这里添加你的内容</p>`}
+      </div>
+    </div>
+  `,
+  plaza: content => `
+    <style>
+      .tpl-plaza { background: linear-gradient(145deg, rgba(37,99,235,0.12), rgba(123,97,255,0.12)); padding: 16px; border-radius: 18px; }
+      .tpl-plaza-inner { background: #fff; border: 1px solid rgba(37,99,235,0.14); border-radius: 16px; padding: 18px; box-shadow: 0 12px 28px rgba(37,99,235,0.15); }
+      .tpl-plaza-inner h1, .tpl-plaza-inner h2, .tpl-plaza-inner h3, .tpl-plaza-inner h4 { color: #0f172a; }
+      .tpl-plaza-inner p { color: #1f2937; line-height: 1.85; }
+      .tpl-plaza-inner code { background: rgba(37,99,235,0.08); padding: 3px 6px; border-radius: 6px; color: #1d4ed8; }
+      .tpl-plaza-inner pre { background: #0f172a; color: #e2e8f0; border-radius: 12px; padding: 12px; }
+    </style>
+    <div class="tpl-plaza">
+      <div class="tpl-plaza-inner">
+        ${content || `<p>在这里添加你的内容</p>`}
+      </div>
+    </div>
+  `,
+  sunset: content => `
+    <style>
+      .tpl-sunset { background: linear-gradient(145deg, rgba(249,115,22,0.14), rgba(244,114,182,0.12)); padding: 16px; border-radius: 18px; }
+      .tpl-sunset-inner { background: #fffaf5; border: 1px solid rgba(249,115,22,0.2); border-radius: 16px; padding: 18px; box-shadow: 0 12px 26px rgba(249,115,22,0.16); }
+      .tpl-sunset-inner h1, .tpl-sunset-inner h2, .tpl-sunset-inner h3, .tpl-sunset-inner h4 { color: #7c2d12; }
+      .tpl-sunset-inner p { color: #4a2c16; line-height: 1.85; }
+      .tpl-sunset-inner code { background: rgba(249,115,22,0.1); padding: 3px 6px; border-radius: 6px; color: #c2410c; }
+      .tpl-sunset-inner pre { background: #0f172a; color: #fef9ee; border-radius: 12px; padding: 12px; }
+    </style>
+    <div class="tpl-sunset">
+      <div class="tpl-sunset-inner">
+        ${content || `<p>在这里添加你的内容</p>`}
+      </div>
+    </div>
+  `,
+  ink: content => `
+    <style>
+      .tpl-ink { background: linear-gradient(135deg, #0b1220, #0f172a); padding: 16px; border-radius: 18px; border: 1px solid rgba(209,177,122,0.26); }
+      .tpl-ink-inner { background: rgba(15,23,42,0.9); border-radius: 16px; padding: 18px; box-shadow: 0 14px 32px rgba(0,0,0,0.32); border: 1px solid rgba(209,177,122,0.22); }
+      .tpl-ink-inner h1, .tpl-ink-inner h2, .tpl-ink-inner h3, .tpl-ink-inner h4 { color: #f7f3ea; }
+      .tpl-ink-inner p { color: #cbd5e1; line-height: 1.9; }
+      .tpl-ink-inner code { background: rgba(209,177,122,0.12); padding: 3px 6px; border-radius: 6px; color: #f7f3ea; }
+      .tpl-ink-inner pre { background: #0b1220; color: #f7f3ea; border-radius: 12px; padding: 12px; border: 1px solid rgba(209,177,122,0.2); }
+    </style>
+    <div class="tpl-ink">
+      <div class="tpl-ink-inner">
+        ${content || `<p>在这里添加你的内容</p>`}
+      </div>
+    </div>
+  `,
+}
+
+function buildHtmlWithTemplate(themeKey: TemplateApplyPayload[`themeKey`], content: string) {
+  const builder = htmlTemplates[themeKey]
+  return builder ? builder(content) : content
+}
+
+function ensureRenderer() {
+  if (renderStore.getRenderer())
+    return
+
+  renderStore.initRendererInstance(
+    cssEditorStore.getCurrentTabContent(),
+    themeMap[themeStore.theme],
+    themeStore.fontFamily,
+    themeStore.fontSize,
+    {
+      primaryColor: themeStore.primaryColor,
+      isUseIndent: themeStore.isUseIndent,
+      isUseJustify: themeStore.isUseJustify,
+      isMacCodeBlock: themeStore.isMacCodeBlock,
+      isShowLineNumber: themeStore.isShowLineNumber,
+    },
+  )
+}
+
+function toggleTemplateGallery() {
+  showTemplateGallery.value = !showTemplateGallery.value
+  // 确保移动端在模板模式下也能看到左侧区域
+  if (showTemplateGallery.value)
+    showEditor.value = true
+}
+
+function closeTemplateGallery() {
+  showTemplateGallery.value = false
+}
+
+function applyTemplateFromGallery(payload: TemplateApplyPayload) {
+  const { themeKey, primaryColor, name } = payload
+  // HTML 模式：直接生成带样式的 HTML 模板，不再切换到 Markdown
+  if (isHtmlMode.value) {
+    const html = buildHtmlWithTemplate(themeKey, htmlEditorStore.htmlContent)
+    htmlEditorStore.setHtmlContent(html)
+    editorRefresh()
+    toast.success(`已应用「${name}」模板（HTML）`)
+    closeTemplateGallery()
+    return
+  }
+
+  ensureRenderer()
+  themeStore.theme = themeKey
+  if (primaryColor)
+    themeStore.primaryColor = primaryColor
+
+  renderStore.updateTheme(
+    cssEditorStore.getCurrentTabContent(),
+    themeMap[themeKey],
+    themeStore.fontFamily,
+    themeStore.fontSize,
+    primaryColor || themeStore.primaryColor,
+  )
+
+  editorRefresh()
+  toast.success(`已应用「${name}」模板`)
+  closeTemplateGallery()
+}
 
 // 切换编辑/预览视图（仅限移动端）
 function toggleView() {
@@ -550,7 +703,7 @@ function createFormTextArea(dom: HTMLDivElement) {
         onSearch: openSearchWithSelection,
       }),
       truncateBase64Images(), // 截断 base64 图片数据显示
-      themeCompartment.of(theme(isDark.value)),
+      themeCompartment.of(codeMirrorTheme(isDark.value)),
       EditorView.updateListener.of((update) => {
         if (update.docChanged) {
           const value = update.state.doc.toString()
@@ -676,7 +829,7 @@ onMounted(() => {
 watch(isDark, () => {
   if (codeMirrorView.value) {
     codeMirrorView.value.dispatch({
-      effects: themeCompartment.reconfigure(theme(isDark.value)),
+      effects: themeCompartment.reconfigure(codeMirrorTheme(isDark.value)),
     })
   }
 })
@@ -783,25 +936,50 @@ onUnmounted(() => {
                 'border-r': isEditOnLeft,
               }"
             >
-              <SearchTab v-if="codeMirrorView && !isHtmlMode" ref="searchTabRef" :editor-view="codeMirrorView as any" />
-              <SidebarAIToolbar
-                :is-mobile="isMobile"
-                :show-editor="showEditor"
+              <div class="template-toggle absolute left-3 top-3 z-30 flex gap-2">
+                <Button size="sm" variant="secondary" class="shadow-sm" @click="toggleTemplateGallery">
+                  <Palette class="mr-1 h-4 w-4" />
+                  精美模板
+                </Button>
+                <Button
+                  v-if="showTemplateGallery"
+                  size="sm"
+                  variant="outline"
+                  class="shadow-sm"
+                  @click="closeTemplateGallery"
+                >
+                  返回编辑
+                </Button>
+              </div>
+
+              <TemplateGallery
+                v-if="showTemplateGallery"
+                :current-theme="theme"
+                @apply="applyTemplateFromGallery"
+                @close="closeTemplateGallery"
               />
 
-              <EditorContextMenu v-if="!isHtmlMode">
-                <div
-                  id="editor"
-                  ref="editorRef"
-                  class="codemirror-container"
+              <template v-else>
+                <SearchTab v-if="codeMirrorView && !isHtmlMode" ref="searchTabRef" :editor-view="codeMirrorView as any" />
+                <SidebarAIToolbar
+                  :is-mobile="isMobile"
+                  :show-editor="showEditor"
                 />
-              </EditorContextMenu>
-              <div v-else class="html-editor-wrapper h-full">
-                <HtmlEditorView
-                  ref="htmlEditorRef"
-                  @content-change="handleHtmlContentChange"
-                />
-              </div>
+
+                <EditorContextMenu v-if="!isHtmlMode">
+                  <div
+                    id="editor"
+                    ref="editorRef"
+                    class="codemirror-container"
+                  />
+                </EditorContextMenu>
+                <div v-else class="html-editor-wrapper h-full">
+                  <HtmlEditorView
+                    ref="htmlEditorRef"
+                    @content-change="handleHtmlContentChange"
+                  />
+                </div>
+              </template>
             </div>
             <div
               v-show="!isMobile || (isMobile && !showEditor)"
