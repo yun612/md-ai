@@ -598,6 +598,7 @@ async function uploadMdImg({
 }
 
 const codeMirrorWrapper = useTemplateRef<ComponentPublicInstance<HTMLDivElement>>(`codeMirrorWrapper`)
+const editorRef = useTemplateRef<HTMLDivElement>(`editorRef`)
 
 // 转换 markdown 中的本地图片为线上图片
 // todo 处理事件覆盖
@@ -665,6 +666,7 @@ watch(isHtmlMode, (newMode) => {
     })
   }
   else {
+    // 切换到 Markdown 模式
     if (codeMirrorView.value) {
       const currentContent = codeMirrorView.value.state.doc.toString()
       if (currentContent !== currentPost.content) {
@@ -675,6 +677,13 @@ watch(isHtmlMode, (newMode) => {
             insert: currentPost.content,
           },
         })
+      }
+    }
+    else {
+      // 如果编辑器还未创建，则创建它
+      const editorDom = editorRef.value
+      if (editorDom) {
+        createFormTextArea(editorDom)
       }
     }
     editorRefresh()
@@ -691,7 +700,6 @@ watch(htmlContent, (newContent) => {
   }
 })
 
-const editorRef = useTemplateRef<HTMLDivElement>(`editorRef`)
 const progressValue = ref(0)
 
 function createFormTextArea(dom: HTMLDivElement) {
@@ -731,6 +739,7 @@ function createFormTextArea(dom: HTMLDivElement) {
   })
 
   codeMirrorView.value = view
+  editor.value = view // 同时赋值给 editorStore 的 editor
 
   // 添加粘贴事件监听
   view.dom.addEventListener(`paste`, async (event: ClipboardEvent) => {

@@ -1,3 +1,4 @@
+import type { EditorView } from '@codemirror/view'
 import { useStorage } from '@vueuse/core'
 import { addPrefix } from '@/utils'
 
@@ -8,6 +9,7 @@ export const useHtmlEditorStore = defineStore(`htmlEditor`, () => {
 
   const htmlContent = ref(``)
   const markdownContent = ref(``)
+  const htmlEditor = ref<EditorView | null>(null)
 
   const isHtmlMode = computed(() => editMode.value === `html`)
   const isMarkdownMode = computed(() => editMode.value === `markdown`)
@@ -36,6 +38,7 @@ export const useHtmlEditorStore = defineStore(`htmlEditor`, () => {
     editMode,
     htmlContent,
     markdownContent,
+    htmlEditor,
     isHtmlMode,
     isMarkdownMode,
     switchToHtml,

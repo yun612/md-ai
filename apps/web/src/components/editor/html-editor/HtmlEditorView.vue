@@ -66,6 +66,9 @@ onMounted(() => {
     parent: editorContainer.value,
   })
 
+  // 保存编辑器实例到 store
+  htmlEditorStore.htmlEditor = editorView
+
   // 监听格式切换事件
   const handleModeChange = (event: Event) => {
     const customEvent = event as CustomEvent
@@ -95,6 +98,7 @@ watch(isDark, (newIsDark) => {
 
 onUnmounted(() => {
   editorView?.destroy()
+  htmlEditorStore.htmlEditor = null
 })
 
 function getDefaultHtmlTemplate(): string {

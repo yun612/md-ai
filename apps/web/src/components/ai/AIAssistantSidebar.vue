@@ -24,6 +24,7 @@ import { toast } from 'vue-sonner'
 import { IndexedDBTaskStorage } from '@/agents/indexeddb_storage'
 import AIConfig from '@/components/ai/chat-box/AIConfig.vue'
 import MessageBlock from '@/components/ai/chat-box/MessageBlock.vue'
+import { useHtmlEditorStore } from '@/components/editor/html-editor/useHtmlEditorStore'
 import OutlineEditor from '@/components/OutlineEditor.vue'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -35,15 +36,37 @@ import { copyPlain } from '@/utils/clipboard'
 import { SimplePromptBuilder, WriteArticleToolHandler } from '../../agents/index'
 
 const editorStore = useEditorStore()
+const htmlEditorStore = useHtmlEditorStore()
 const { editor } = storeToRefs(editorStore)
+const { isHtmlMode } = storeToRefs(htmlEditorStore)
+// 直接访问 htmlEditor，因为 storeToRefs 可能有问题
+const htmlEditor = computed(() => htmlEditorStore.htmlEditor)
 
 /* ---------- 待写入编辑器的文章内容 ---------- */
 const pendingArticleContent = ref<string | null>(null)
 
 /* ---------- 监听编辑器初始化，自动写入待定内容 ---------- */
 watch(editor, (newEditor) => {
-  if (newEditor && pendingArticleContent.value) {
-    console.log(`[write_artical] 编辑器已就绪，写入待定内容`)
+  if (newEditor && pendingArticleContent.value && !isHtmlMode?.value) {
+    console.log(`[write_artical] Markdown 编辑器已就绪，写入待定内容`)
+    const content = pendingArticleContent.value
+    pendingArticleContent.value = null
+    newEditor.dispatch({
+      changes: {
+        from: 0,
+        to: newEditor.state.doc.length,
+        insert: content,
+      },
+      selection: { anchor: content.length },
+    })
+    console.log(`[write_artical] 文章内容已替换到编辑器`)
+  }
+}, { immediate: true })
+
+/* ---------- 监听 HTML 编辑器初始化，自动写入待定内容 ---------- */
+watch(htmlEditor, (newEditor) => {
+  if (newEditor && pendingArticleContent.value && isHtmlMode?.value) {
+    console.log(`[write_artical] HTML 编辑器已就绪，写入待定内容`)
     const content = pendingArticleContent.value
     pendingArticleContent.value = null
     newEditor.dispatch({
@@ -289,44 +312,60 @@ function switchToImageGenerator() {
 
 // 将图片应用到编辑器
 function applyImageToEditor(img: { url?: string, base64?: string, prompt?: string }) {
-  if (!editor.value) {
+  const currentEditor = (isHtmlMode?.value) ? htmlEditor?.value : editor?.value
+
+  if (!currentEditor) {
     toast.error(`编辑器未初始化`)
     return
   }
 
   try {
-    // 生成图片的 Markdown 语法
+    // 生成图片的语法（HTML 或 Markdown）
     const altText = img.prompt || `图片`
-    let imageMarkdown = ``
-    if (img.url) {
-      // 如果有 URL，使用 URL
-      imageMarkdown = `![${altText}](${img.url})`
-    }
-    else if (img.base64) {
-      // 如果是 base64，使用 data URI
-      // ![](data:image/png;base64,${img.base64})
-      imageMarkdown = `![${altText}](data:image/png;base64,${img.base64})`
+    let imageContent = ``
+
+    if (isHtmlMode?.value) {
+      // HTML 模式：使用 <img> 标签
+      if (img.url) {
+        imageContent = `<img src="${img.url}" alt="${altText}" style="max-width:100%;">`
+      }
+      else if (img.base64) {
+        imageContent = `<img src="data:image/png;base64,${img.base64}" alt="${altText}" style="max-width:100%;">`
+      }
+      else {
+        toast.error(`图片数据无效`)
+        return
+      }
     }
     else {
-      toast.error(`图片数据无效`)
-      return
+      // Markdown 模式：使用 Markdown 语法
+      if (img.url) {
+        imageContent = `![${altText}](${img.url})`
+      }
+      else if (img.base64) {
+        imageContent = `![${altText}](data:image/png;base64,${img.base64})`
+      }
+      else {
+        toast.error(`图片数据无效`)
+        return
+      }
     }
 
     // 获取当前编辑器内容
-    const currentContent = editor.value.state.doc.toString()
-    const insertPosition = editor.value.state.selection.main.head
+    const currentContent = currentEditor.state.doc.toString()
+    const insertPosition = currentEditor.state.selection.main.head
 
     // 如果编辑器不为空，在插入位置前后添加换行
     const prefix = currentContent.length > 0 && insertPosition > 0 ? `\n\n` : ``
     const suffix = currentContent.length > insertPosition ? `\n\n` : ``
 
-    // 插入图片 Markdown
-    editor.value.dispatch({
+    // 插入图片
+    currentEditor.dispatch({
       changes: {
         from: insertPosition,
-        insert: prefix + imageMarkdown + suffix,
+        insert: prefix + imageContent + suffix,
       },
-      selection: { anchor: insertPosition + prefix.length + imageMarkdown.length + suffix.length },
+      selection: { anchor: insertPosition + prefix.length + imageContent.length + suffix.length },
     })
 
     toast.success(`图片已插入到编辑器`)
@@ -575,14 +614,16 @@ function handleUseOutline(outline: OutlineData) {
     })
 
     // 插入到编辑器（追加到末尾）
-    if (editor.value) {
-      const currentContent = editor.value.state.doc.toString()
+    const currentEditor = (isHtmlMode?.value) ? htmlEditor?.value : editor?.value
+
+    if (currentEditor) {
+      const currentContent = currentEditor.state.doc.toString()
       const insertPosition = currentContent.length
 
       // 如果编辑器不为空，先添加换行，这个是非常关键的点
       const prefix = currentContent.trim() ? `\n\n` : ``
 
-      editor.value.dispatch({
+      currentEditor.dispatch({
         changes: {
           from: insertPosition,
           insert: prefix + markdownContent,
@@ -688,11 +729,23 @@ async function startTaskWithStreaming(
 
   const modelConfig = getModelConfig()
 
+  console.log(`[startTaskWithStreaming] Debug:`, {
+    isHtmlMode,
+    htmlEditor,
+    editor,
+    htmlEditorStoreRaw: htmlEditorStore,
+    htmlEditorFromStore: htmlEditorStore.htmlEditor,
+    isHtmlModeValue: isHtmlMode?.value,
+    htmlEditorValue: htmlEditor?.value,
+    editorValue: editor?.value,
+  })
+
+  const currentEditor = (isHtmlMode?.value) ? htmlEditor?.value : editor?.value
   const taskContext: TaskContext = {
     modelConfig,
     variables: {
     },
-    systemPromptBuilder: new SimplePromptBuilder(editor?.value?.state.doc.toString() || ``),
+    systemPromptBuilder: new SimplePromptBuilder(currentEditor?.state.doc.toString() || ``),
     tools: [
       // new GenerateOutlineToolHandler(),
       new WriteArticleToolHandler(),
@@ -839,17 +892,20 @@ async function sendMessage() {
             const articleContent = repaired.content || ``
             console.log(`[articleContent]: `, articleContent)
 
-            if (editor.value && articleContent) {
-              editor.value.dispatch({
+            // 根据当前模式选择正确的编辑器
+            const currentEditor = (isHtmlMode?.value) ? htmlEditor?.value : editor?.value
+
+            if (currentEditor && articleContent) {
+              currentEditor.dispatch({
                 changes: {
                   from: 0,
-                  to: editor.value.state.doc.length,
+                  to: currentEditor.state.doc.length,
                   insert: articleContent,
                 },
                 selection: { anchor: articleContent.length },
               })
 
-              console.log(`[write_artical] 文章内容已替换到编辑器`)
+              console.log(`[write_artical] 文章内容已替换到编辑器 (${isHtmlMode?.value ? `HTML` : `Markdown`} 模式)`)
             }
             else if (articleContent) {
               console.log(`[write_artical] 编辑器未就绪，保存待写入内容`)
@@ -857,7 +913,9 @@ async function sendMessage() {
             }
             else {
               console.log(`[write_artical] 未写入编辑器:`, {
-                editorExists: !!editor.value,
+                isHtmlMode: isHtmlMode?.value,
+                htmlEditorExists: !!htmlEditor?.value,
+                markdownEditorExists: !!editor?.value,
                 contentLength: articleContent?.length,
               })
             }
