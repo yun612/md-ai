@@ -630,13 +630,21 @@ async function sendMessage() {
           console.log(`[sendMessage] Tool call:`, chunk.tool_call)
 
           if (currentToolCall && currentToolCall.function.name === chunk.tool_call.function.name) {
+            console.log(`[sendMessage] Continuing tool call for:`, chunk.tool_call.function.name)
+            console.log(`[sendMessage] Previous tool arguments:`, toolArguments)
+            console.log(`[sendMessage] New chunk arguments:`, chunk.tool_call.function.arguments)
             toolArguments += chunk.tool_call.function.arguments
             currentToolCall.function.arguments += chunk.tool_call.function.arguments
+            console.log(`[sendMessage] Updated tool arguments:`, toolArguments)
           }
           else {
+            console.log(`[sendMessage] New tool call detected`)
+            console.log(`[sendMessage] Previous tool call:`, currentToolCall)
             currentToolCall = { ...chunk.tool_call }
             toolName = chunk.tool_call.function.name || ``
             toolArguments = chunk.tool_call.function.arguments || ``
+            console.log(`[sendMessage] New tool name:`, toolName)
+            console.log(`[sendMessage] New tool arguments:`, toolArguments)
           }
 
           const toolCallBlock: ContentBlock = {
@@ -645,30 +653,55 @@ async function sendMessage() {
             name: toolName,
             input: currentToolCall.function.arguments,
           }
+          console.log(`[sendMessage] Tool call block created:`, toolCallBlock)
 
           if (Array.isArray(lastMessage.content)) {
+            console.log(`[sendMessage] Last message content is array, length:`, lastMessage.content.length)
             const existingIndex = lastMessage.content.findIndex(
               (block: ContentBlock) => block.type === `tool_use` && block.tool_use_id === toolCallBlock.tool_use_id,
             )
+            console.log(`[sendMessage] Existing tool call index:`, existingIndex)
             if (existingIndex !== -1) {
+              console.log(`[sendMessage] Updating existing tool call at index:`, existingIndex)
               lastMessage.content[existingIndex] = toolCallBlock
             }
             else {
+              console.log(`[sendMessage] Adding new tool call to content`)
               lastMessage.content.push(toolCallBlock)
             }
             if (!toolHandler) {
+              console.log(`[sendMessage] Creating tool handler for:`, toolName)
               const currentEditor = getCurrentEditor()
               switch (toolName) {
                 case `write_article`:
                   toolHandler = new WriteArticleToolHandler(currentEditor, isHtmlMode?.value || false)
+                  console.log(`[sendMessage] WriteArticleToolHandler created`)
                   break
                 case `generate_outline`:
                   toolHandler = new GenerateOutlineToolHandler()
+                  console.log(`[sendMessage] GenerateOutlineToolHandler created`)
                   break
+                default:
+                  console.log(`[sendMessage] No handler for tool:`, toolName)
               }
+            }
+            if (toolHandler && toolHandler.getConfig().humanInLoop) {
+              const parsedArguments = toolArguments ? parse(toolArguments) : {}
+              const toolCallWithParsedArgs = {
+                ...currentToolCall,
+                function: {
+                  ...currentToolCall.function,
+                  arguments: parsedArguments,
+                },
+              }
+              await toolHandler.execute(toolCallWithParsedArgs, taskContext)
+            }
+            else {
+              console.log(`[sendMessage] Tool handler already exists`)
             }
           }
           else {
+            console.log(`[sendMessage] Last message content is not array, replacing with array`)
             lastMessage.content = [toolCallBlock]
           }
           console.log(`[sendMessage] Last message after tool call:`, lastMessage)
@@ -678,18 +711,6 @@ async function sendMessage() {
       else {
         console.log(`[sendMessage] ERROR: Last message is not assistant or is undefined!`)
       }
-    }
-
-    if (toolHandler && toolHandler.getConfig().humanInLoop) {
-      const parsedArguments = parse(toolArguments)
-      const toolCallWithParsedArgs = {
-        ...currentToolCall,
-        function: {
-          ...currentToolCall.function,
-          arguments: parsedArguments,
-        },
-      }
-      await toolHandler.execute(toolCallWithParsedArgs, taskContext)
     }
 
     const lastIndex = messages.value.length - 1

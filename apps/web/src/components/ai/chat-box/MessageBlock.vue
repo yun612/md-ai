@@ -186,9 +186,7 @@ function parseToolInput(input: any): Record<string, any> | null {
         >
           思考中…
         </div>
-        <div v-else class="text-xs opacity-50">
-          (无内容)
-        </div>
+        <div v-else class="text-xs opacity-50" />
         <div v-if="getToolUseBlocks(msg.content || []).length > 0" class="mt-3 pt-2 border-t border-border/30">
           <div class="text-xs font-medium opacity-70 mb-2">
             工具调用：
