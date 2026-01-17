@@ -100,7 +100,6 @@ function getAllStoreStates() {
     isShowInsertFormDialog: displayStore.isShowInsertFormDialog,
     isShowUploadImgDialog: displayStore.isShowUploadImgDialog,
     isShowInsertMpCardDialog: displayStore.isShowInsertMpCardDialog,
-    aiDialogVisible: displayStore.aiDialogVisible,
     aiImageDialogVisible: displayStore.aiImageDialogVisible,
   }
 }
@@ -316,8 +315,6 @@ function applyImportedConfig() {
         displayStore.isShowUploadImgDialog = value
       else if (key === `isShowInsertMpCardDialog`)
         displayStore.isShowInsertMpCardDialog = value
-      else if (key === `aiDialogVisible`)
-        displayStore.aiDialogVisible = value
       else if (key === `aiImageDialogVisible`)
         displayStore.aiImageDialogVisible = value
     }

@@ -19,8 +19,11 @@ export class SimplePromptBuilder implements ISystemPromptBuilder {
 请注意，HTML与CSS语法是有限制的，它可以使用的范围为以下内容，你只能从这些内容中选择使用：
 # 能力 & 工具调用
 1. 以下是你拥有的所有工具，在合理的时机选择使用它们并完成用户的需求。
+## write_artcle
+当用户请求创作内容时，请使用此工具。
+参数:
+- content: 文章内容，格式必须为<section>标签+style内联样式渲染的文章。
 
-## 制定待办计划
 
 # 常见工作流程
 1. 当用户提出写作需求时，首先需要审阅当前文章内容，结合需求决定是否有必要执行网络搜索。

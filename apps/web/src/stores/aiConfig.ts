@@ -127,8 +127,9 @@ export const useAIConfigStore = defineStore(`AIConfig`, () => {
   const isLoaded = ref(false)
 
   async function loadConfig() {
-    await clearOldConfigs()
-    await clearDuplicateConfigs()
+    // 移除或注释掉清理逻辑，避免误删正常配置
+    // await clearOldConfigs()
+    // await clearDuplicateConfigs()
 
     const storage = getStorage()
     const globalConfig = await storage.getConfigByKey(`global`, AI_CONFIG_CATEGORY)
@@ -202,9 +203,19 @@ export const useAIConfigStore = defineStore(`AIConfig`, () => {
     await storage.createConfig(globalData)
   }
 
+  // 自动保存配置
   watch(type, async (newType) => {
+    if (!isLoaded.value || !newType)
+      return
     await syncServiceConfig(newType)
+    await saveGlobalConfig()
   })
+
+  watch([model, endpoint, apiKey, temperature, maxToken], async () => {
+    if (!isLoaded.value)
+      return
+    await saveCurrentConfig()
+  }, { deep: true })
 
   const reset = async () => {
     type.value = DEFAULT_SERVICE_TYPE

@@ -30,16 +30,13 @@ const outlineData = computed({
   set: value => emit(`update:modelValue`, value),
 })
 
-// 拖拽状态
 const dragSourceId = ref<string | null>(null)
 const dropTargetId = ref<string | null>(null)
 
-// 生成唯一 ID，避免重复
 function generateId(): string {
   return `outline-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
 }
 
-// 添加新选项
 function addItem(index?: number) {
   const newItem: OutlineItem = {
     id: generateId(),
@@ -55,7 +52,6 @@ function addItem(index?: number) {
   }
 }
 
-// 删除项
 function removeItem(id: string) {
   const index = outlineData.value.items.findIndex(item => item.id === id)
   if (index !== -1) {
@@ -63,20 +59,17 @@ function removeItem(id: string) {
   }
 }
 
-// 拖拽开始
 function handleDragStart(id: string, e: DragEvent) {
   dragSourceId.value = id
   e.dataTransfer?.setData(`text/plain`, id)
   e.dataTransfer!.effectAllowed = `move`
 }
 
-// 拖拽结束
 function handleDragEnd() {
   dragSourceId.value = null
   dropTargetId.value = null
 }
 
-// 拖拽放置
 function handleDrop(targetId: string, e: DragEvent) {
   e.preventDefault()
   e.stopPropagation()
@@ -92,14 +85,11 @@ function handleDrop(targetId: string, e: DragEvent) {
   const targetIndex = outlineData.value.items.findIndex(item => item.id === targetId)
 
   if (sourceIndex !== -1 && targetIndex !== -1 && sourceIndex !== targetIndex) {
-    // 创建新数组以避免响应式问题
     const newItems = [...outlineData.value.items]
     const [removed] = newItems.splice(sourceIndex, 1)
 
-    // 插入位置
     let insertIndex = targetIndex
 
-    // 如果源索引小于目标索引，由于先移除了源项，目标索引需要减1
     if (sourceIndex < targetIndex) {
       insertIndex = targetIndex - 1
     }
@@ -112,7 +102,6 @@ function handleDrop(targetId: string, e: DragEvent) {
   dropTargetId.value = null
 }
 
-// 拖拽悬停
 function handleDragOver(id: string, e: DragEvent) {
   e.preventDefault()
   e.stopPropagation()
@@ -122,7 +111,6 @@ function handleDragOver(id: string, e: DragEvent) {
   }
 }
 
-// 拖拽离开
 function handleDragLeave(e: DragEvent) {
   const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
   const x = e.clientX
@@ -133,7 +121,6 @@ function handleDragLeave(e: DragEvent) {
   }
 }
 
-// 使用大纲写内容
 function useOutline() {
   emit(`useOutline`, outlineData.value)
 }
@@ -162,7 +149,6 @@ function useOutline() {
       />
     </div>
 
-    <!-- 大纲列表 -->
     <div class="space-y-3">
       <div class="flex items-center justify-between">
         <label class="text-sm font-medium">大纲内容</label>
@@ -199,12 +185,10 @@ function useOutline() {
         @dragleave.stop.prevent="handleDragLeave($event)"
       >
         <div class="flex items-start gap-3">
-          <!-- 拖拽手柄 -->
           <div class="drag-handle cursor-move pt-1 text-muted-foreground hover:text-foreground transition-colors">
             <GripVertical class="h-5 w-5" />
           </div>
 
-          <!-- 内容区域 -->
           <div class="flex-1 space-y-3">
             <div class="space-y-1">
               <div class="flex items-center gap-2">
@@ -217,7 +201,6 @@ function useOutline() {
               />
             </div>
 
-            <!-- 内容输入 -->
             <div class="space-y-1">
               <label class="text-xs text-muted-foreground">内容</label>
               <Textarea
@@ -228,7 +211,6 @@ function useOutline() {
             </div>
           </div>
 
-          <!-- 操作按钮 -->
           <div class="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
             <Button
               variant="ghost"

@@ -19,13 +19,8 @@ export const useDisplayStore = defineStore(`display`, () => {
   const isShowUploadImgDialog = ref(false)
   const toggleShowUploadImgDialog = useToggle(isShowUploadImgDialog)
 
-  // AI 对话框
-  const aiDialogVisible = ref(false)
+  // AI 文生图对话框
   const aiImageDialogVisible = ref(false)
-
-  function toggleAIDialog(value?: boolean) {
-    aiDialogVisible.value = value ?? !aiDialogVisible.value
-  }
 
   function toggleAIImageDialog(value?: boolean) {
     aiImageDialogVisible.value = value ?? !aiImageDialogVisible.value
@@ -43,8 +38,6 @@ export const useDisplayStore = defineStore(`display`, () => {
     toggleShowInsertMpCardDialog,
     isShowUploadImgDialog,
     toggleShowUploadImgDialog,
-    aiDialogVisible,
-    toggleAIDialog,
     aiImageDialogVisible,
     toggleAIImageDialog,
     showResetConfirm,

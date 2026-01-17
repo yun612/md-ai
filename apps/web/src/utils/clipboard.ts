@@ -20,16 +20,18 @@ function legacyCopy(text: string): Promise<void> {
   })
 }
 
-export async function copyPlain(text: string): Promise<void> {
+export async function copyPlain(text: unknown): Promise<void> {
+  const textStr = typeof text === `string` ? text : String(text)
+
   if (window.isSecureContext && navigator.clipboard?.writeText) {
     try {
-      await navigator.clipboard.writeText(text)
+      await navigator.clipboard.writeText(textStr)
       return
     }
     catch {
     }
   }
-  await legacyCopy(text)
+  await legacyCopy(textStr)
 }
 
 export async function copyHtml(html: string, fallback?: string): Promise<void> {

@@ -1,9 +1,8 @@
 <script setup lang="ts">
-import { Bot, Image as ImageIcon, Settings2, Wand2 } from 'lucide-vue-next'
+import { Image as ImageIcon, Settings2, Wand2 } from 'lucide-vue-next'
 import { useDisplayStore } from '@/stores/display'
 import { useEditorStore } from '@/stores/editor'
 import { useUIStore } from '@/stores/ui'
-import AIAssistantPanel from './chat-box/AIAssistantPanel.vue'
 import AIImageGeneratorPanel from './image-generator/AIImageGeneratorPanel.vue'
 import { AIPolishPopover } from './tool-box'
 
@@ -13,8 +12,8 @@ defineProps<{
 }>()
 
 const displayStore = useDisplayStore()
-const { aiDialogVisible, aiImageDialogVisible } = storeToRefs(displayStore)
-const { toggleAIDialog, toggleAIImageDialog } = displayStore
+const { aiImageDialogVisible } = storeToRefs(displayStore)
+const { toggleAIImageDialog } = displayStore
 
 const editorStore = useEditorStore()
 const { editor } = storeToRefs(editorStore)
@@ -108,11 +107,6 @@ function toggleExpanded() {
       selectionHintTimer = null
     }
   }
-}
-
-// 打开AI助手
-function openAIChat() {
-  toggleAIDialog(true)
 }
 
 // 打开AI文生图
@@ -233,27 +227,6 @@ onMounted(() => {
     >
       <!-- 展开状态的AI按钮 -->
       <div class="flex flex-col py-2 gap-2">
-        <!-- AI助手按钮 -->
-        <div class="flex flex-col items-center gap-1 px-1">
-          <button
-            class="group relative w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-md hover:shadow-lg transform hover:scale-105 active:scale-95 transition-all duration-200 flex items-center justify-center utools-ai-button"
-            title="AI助手"
-            @click="openAIChat"
-          >
-            <Bot class="h-4 w-4" />
-          </button>
-
-          <!-- 标签 -->
-          <span class="text-[9px] text-gray-500 dark:text-gray-400 font-medium text-center leading-tight">
-            助手
-          </span>
-        </div>
-
-        <!-- 分割线 -->
-        <div class="mx-1.5">
-          <div class="h-px bg-gray-200/50 dark:bg-gray-700/50" />
-        </div>
-
         <!-- AI文生图按钮 -->
         <div class="flex flex-col items-center gap-1 px-1">
           <button
@@ -268,11 +241,6 @@ onMounted(() => {
           <span class="text-[9px] text-gray-500 dark:text-gray-400 font-medium text-center leading-tight">
             文生图
           </span>
-        </div>
-
-        <!-- 分割线 -->
-        <div v-if="hasSelectedText && isExpanded" class="mx-1.5">
-          <div class="h-px bg-gray-200/50 dark:bg-gray-700/50" />
         </div>
 
         <!-- AI工具箱按钮 (只有选中文本且展开时才显示) -->
@@ -294,7 +262,6 @@ onMounted(() => {
     </div>
 
     <!-- AI面板组件 -->
-    <AIAssistantPanel v-model:open="aiDialogVisible" />
     <AIImageGeneratorPanel v-model:open="aiImageDialogVisible" />
 
     <!-- AI工具箱弹窗 -->

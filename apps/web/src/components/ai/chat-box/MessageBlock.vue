@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import type { ChatMessage as BaseChatMessage, ContentBlock } from '@grisaiaevy/crafting-agent'
+import type { ChatMessage as BaseChatMessage, ContentBlock, TaskContext, ToolHandler } from '@grisaiaevy/crafting-agent'
 import DOMPurify from 'isomorphic-dompurify'
 import { Check, Copy, Edit, RefreshCcw } from 'lucide-vue-next'
 import { marked } from 'marked'
 import { ref } from 'vue'
 import { Button } from '@/components/ui/button'
+import ToolCallDisplay from './ToolCallDisplay.vue'
 
 interface ChatMessage extends Omit<BaseChatMessage, `role` | `id`> {
   id?: string
@@ -31,18 +32,21 @@ interface Props {
   msg: ChatMessage
   index: number
   isLastMessage: boolean
-  copiedIndex: number | null
+  copiedIndex?: number | null
+  taskContext?: TaskContext
 }
 
 interface Emits {
-  (e: `copy`, text: string, index: number): void
+  (e: `onCopy`, text: string, index: number): void
   (e: `edit`, content: string): void
   (e: `regenerate`): void
   (e: `applyImage`, img: { url?: string, base64?: string, prompt?: string }): void
   (e: `downloadImage`, base64: string, filename: string): void
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+  copiedIndex: null,
+})
 const emit = defineEmits<Emits>()
 
 const localShowSearchResults = ref(props.msg.showSearchResults ?? false)
@@ -84,7 +88,7 @@ function renderMarkdown(content: string): string {
 }
 
 function handleCopy() {
-  emit(`copy`, getTextFromContentBlocks(props.msg.content || []), props.index)
+  emit(`onCopy`, getTextFromContentBlocks(props.msg.content || []), props.index)
 }
 
 function handleEdit() {
@@ -113,6 +117,45 @@ function getTextBlocks(content: ContentBlock[]): ContentBlock[] {
   if (!content || !Array.isArray(content))
     return []
   return content.filter(block => block.type === `text` && block.text)
+}
+
+// 获取工具的显示名称
+function getToolDisplayName(toolName: string): string {
+  if (!props.taskContext?.tools)
+    return toolName
+
+  const toolHandler = props.taskContext.tools.find((tool: ToolHandler) => {
+    const toolDef = tool.tool()
+    return toolDef.type === `function` && toolDef.function.name === toolName
+  })
+
+  if (toolHandler) {
+    const config = toolHandler.getConfig() as { displayName?: string, humanInLoop?: boolean }
+    return config.displayName || toolName
+  }
+
+  return toolName
+}
+
+// 解析工具输入参数
+function parseToolInput(input: any): Record<string, any> | null {
+  if (!input)
+    return null
+
+  if (typeof input === `string`) {
+    try {
+      return JSON.parse(input)
+    }
+    catch (e) {
+      return { raw: input }
+    }
+  }
+
+  if (typeof input === `object`) {
+    return input
+  }
+
+  return null
 }
 </script>
 
@@ -151,21 +194,12 @@ function getTextBlocks(content: ContentBlock[]): ContentBlock[] {
             工具调用：
           </div>
           <div class="space-y-2">
-            <div
+            <ToolCallDisplay
               v-for="(toolBlock, toolIndex) in getToolUseBlocks(msg.content || [])"
               :key="toolIndex"
-              class="border border-border/50 rounded-md p-2 bg-muted/30"
-            >
-              <div class="flex items-center gap-2 mb-1.5">
-                <div class="text-xs font-medium text-primary">
-                  {{ toolBlock.name }}
-                </div>
-                <span class="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary">
-                  {{ toolBlock.tool_use_id?.slice(0, 8) || '未知' }}...
-                </span>
-              </div>
-              <pre v-if="toolBlock.input" class="text-xs bg-muted/50 p-2 rounded overflow-x-auto">{{ JSON.stringify(toolBlock.input, null, 2) }}</pre>
-            </div>
+              :tool-name="getToolDisplayName(toolBlock.name || '')"
+              :json-data="parseToolInput(toolBlock.input)"
+            />
           </div>
         </div>
       </template>
@@ -281,7 +315,7 @@ function getTextBlocks(content: ContentBlock[]): ContentBlock[] {
         size="sm"
         class="h-7 px-2 text-xs"
         aria-label="复制内容"
-        @click="handleCopy"
+        @click.stop="handleCopy"
       >
         <Check
           v-if="copiedIndex === index"

@@ -30,5 +30,4 @@ export const storeLabels: Record<string, string> = {
   isShowInsertFormDialog: `显示插入表单对话框`,
   isShowInsertMpCardDialog: `显示插入公众号名片对话框`,
   isShowUploadImgDialog: `显示上传图片对话框`,
-  aiDialogVisible: `AI 对话框可见`,
 }

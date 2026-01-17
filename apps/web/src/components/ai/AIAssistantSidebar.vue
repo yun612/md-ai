@@ -1,9 +1,6 @@
 <script setup lang="ts">
 import type { ChatMessage as BaseChatMessage, ContentBlock, ModelConfig, TaskContext } from '@grisaiaevy/crafting-agent'
-import type { ToolFunctionsContext } from './tool-box'
-import type { OutlineData, OutlineItem } from '@/components/OutlineEditor.vue'
 import { Agent } from '@grisaiaevy/crafting-agent'
-import { useStorage } from '@vueuse/core'
 import {
   Bot,
   Check,
@@ -24,8 +21,8 @@ import { toast } from 'vue-sonner'
 import { IndexedDBTaskStorage } from '@/agents/indexeddb_storage'
 import AIConfig from '@/components/ai/chat-box/AIConfig.vue'
 import MessageBlock from '@/components/ai/chat-box/MessageBlock.vue'
+import OutlinePanel from '@/components/ai/chat-box/OutlinePanel.vue'
 import { useHtmlEditorStore } from '@/components/editor/html-editor/useHtmlEditorStore'
-import OutlineEditor from '@/components/OutlineEditor.vue'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { useAIConfigStore } from '@/stores/aiConfig'
@@ -33,53 +30,16 @@ import { useDisplayStore } from '@/stores/display'
 import { useEditorStore } from '@/stores/editor'
 import { useProjectStore } from '@/stores/project'
 import { copyPlain } from '@/utils/clipboard'
-import { SimplePromptBuilder, WriteArticleToolHandler } from '../../agents/index'
+import { GenerateOutlineToolHandler } from '../../agents/generate_outline'
+import { SimplePromptBuilder } from '../../agents/index'
+import { WriteArticleToolHandler } from '../../agents/write_article'
 
 const editorStore = useEditorStore()
 const htmlEditorStore = useHtmlEditorStore()
 const { editor } = storeToRefs(editorStore)
 const { isHtmlMode } = storeToRefs(htmlEditorStore)
-// 直接访问 htmlEditor，因为 storeToRefs 可能有问题
 const htmlEditor = computed(() => htmlEditorStore.htmlEditor)
 
-/* ---------- 待写入编辑器的文章内容 ---------- */
-const pendingArticleContent = ref<string | null>(null)
-
-/* ---------- 监听编辑器初始化，自动写入待定内容 ---------- */
-watch(editor, (newEditor) => {
-  if (newEditor && pendingArticleContent.value && !isHtmlMode?.value) {
-    console.log(`[write_artical] Markdown 编辑器已就绪，写入待定内容`)
-    const content = pendingArticleContent.value
-    pendingArticleContent.value = null
-    newEditor.dispatch({
-      changes: {
-        from: 0,
-        to: newEditor.state.doc.length,
-        insert: content,
-      },
-      selection: { anchor: content.length },
-    })
-    console.log(`[write_artical] 文章内容已替换到编辑器`)
-  }
-}, { immediate: true })
-
-/* ---------- 监听 HTML 编辑器初始化，自动写入待定内容 ---------- */
-watch(htmlEditor, (newEditor) => {
-  if (newEditor && pendingArticleContent.value && isHtmlMode?.value) {
-    console.log(`[write_artical] HTML 编辑器已就绪，写入待定内容`)
-    const content = pendingArticleContent.value
-    pendingArticleContent.value = null
-    newEditor.dispatch({
-      changes: {
-        from: 0,
-        to: newEditor.state.doc.length,
-        insert: content,
-      },
-      selection: { anchor: content.length },
-    })
-    console.log(`[write_artical] 文章内容已替换到编辑器`)
-  }
-}, { immediate: true })
 const displayStore = useDisplayStore()
 const { toggleAIImageDialog } = displayStore
 
@@ -96,6 +56,7 @@ const copiedIndex = ref<number | null>(null)
 const memoryKey = `ai_memory_context`
 const isQuoteAllContent = ref(false)
 const outlineVisible = ref(false)
+const outlinePanelRef = ref<InstanceType<typeof OutlinePanel> | null>(null)
 
 /* ---------- 即梦API配置 ---------- */
 const jimengConfig = ref({
@@ -110,32 +71,9 @@ function saveJimengConfig() {
   localStorage.setItem(`jimeng_req_key`, jimengConfig.value.reqKey)
 }
 
-// 初始化即梦API配置 - 从 localStorage 加载或使用空值
 jimengConfig.value.accessKeyId = localStorage.getItem(`jimeng_access_key_id`) || ``
 jimengConfig.value.secretAccessKey = localStorage.getItem(`jimeng_secret_access_key`) || ``
 saveJimengConfig()
-
-/* ---------- 大纲数据 ---------- */
-const outlineData = useStorage<OutlineData>(`ai_outline_data`, {
-  topic: `示例：如何写好一篇公众号文章`,
-  items: [
-    {
-      id: `1`,
-      title: `引言：吸引读者注意`,
-      content: `用一个引人入胜的开头，可以是故事、问题或数据，抓住读者的注意力。`,
-    },
-    {
-      id: `2`,
-      title: `正文：核心内容展开`,
-      content: `详细阐述主题，使用案例、数据、观点等支撑内容，保持逻辑清晰。`,
-    },
-    {
-      id: `3`,
-      title: `总结：强化观点`,
-      content: `总结全文要点，给出行动建议或思考方向，让读者有所收获。`,
-    },
-  ],
-})
 
 /* ---------- 消息结构 ---------- */
 interface ChatMessage extends Omit<BaseChatMessage, `role` | `id`> {
@@ -167,8 +105,13 @@ const { currentProject } = storeToRefs(projectStore)
 
 const tasks = ref<any[]>([])
 const currentTask = ref<any>(null)
+const currentTaskContext = ref<TaskContext | undefined>(undefined)
 
 /* ---------- 辅助函数 ---------- */
+function getCurrentEditor() {
+  return isHtmlMode?.value ? htmlEditor?.value : editor?.value
+}
+
 function createTextContentBlock(text: string): ContentBlock[] {
   if (!text)
     return []
@@ -312,7 +255,7 @@ function switchToImageGenerator() {
 
 // 将图片应用到编辑器
 function applyImageToEditor(img: { url?: string, base64?: string, prompt?: string }) {
-  const currentEditor = (isHtmlMode?.value) ? htmlEditor?.value : editor?.value
+  const currentEditor = getCurrentEditor()
 
   if (!currentEditor) {
     toast.error(`编辑器未初始化`)
@@ -512,163 +455,19 @@ async function regenerateLast() {
   sendMessage()
 }
 
-/* ---------- 从内容中解析大纲数据 ---------- */
-function parseOutlineFromContent(content: string) {
-  try {
-    // 尝试从内容中提取 JSON 格式的大纲数据
-    // 支持多种格式：
-    // 1. 直接包含 {"outline": {...}} 的 JSON
-    // 2. 包含在代码块中的 JSON
-    // 3. 直接包含 outline 字段的对象
+function handleUseOutline() {
+  outlineVisible.value = false
+  const items = outlinePanelRef.value?.outlineData.items || []
+  const aiPrompt = `请根据以下大纲继续补充和完善文章内容，让每个章节都更加丰富和详细：
 
-    // 方法1: 尝试提取 JSON 代码块
-    const jsonBlockMatch = content.match(/```(?:json)?\s*(\{[\s\S]*"outline"[\s\S]*\})\s*```/)
-    if (jsonBlockMatch) {
-      const jsonStr = jsonBlockMatch[1]
-      const parsed = JSON.parse(jsonStr)
-      if (parsed.outline) {
-        applyOutlineData(parsed.outline)
-        return
-      }
-    }
-
-    // 方法2: 尝试提取内联 JSON 对象
-    const jsonMatch = content.match(/\{[\s\S]*"outline"[\s\S]*\}/)
-    if (jsonMatch) {
-      const jsonStr = jsonMatch[0]
-      const parsed = JSON.parse(jsonStr)
-      if (parsed.outline) {
-        applyOutlineData(parsed.outline)
-        return
-      }
-    }
-
-    // 方法3: 尝试直接解析整个内容（如果内容是纯 JSON）
-    try {
-      const parsed = JSON.parse(content.trim())
-      if (parsed.outline) {
-        applyOutlineData(parsed.outline)
-      }
-    }
-    catch {
-      // 不是纯 JSON，继续
-    }
-  }
-  catch (e) {
-    console.error(`解析大纲数据失败:`, e)
-  }
-}
-
-/* ---------- 应用大纲数据到大纲编辑器 ---------- */
-function applyOutlineData(outlineResult: OutlineData) {
-  try {
-    if (!outlineResult || !outlineResult.items || !Array.isArray(outlineResult.items)) {
-      console.error(`大纲数据格式不正确`)
-      return
-    }
-
-    // 确保每个 item 都有唯一 ID
-    const processedItems: OutlineItem[] = outlineResult.items.map((item, index) => ({
-      id: item.id || `outline-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
-      title: item.title || `标题 ${index + 1}`,
-      content: item.content || ``,
-    }))
-
-    // 更新大纲数据
-    outlineData.value = {
-      topic: outlineResult.topic || `未指定主题`,
-      items: processedItems,
-    }
-
-    // 显示大纲编辑器
-    outlineVisible.value = true
-    configVisible.value = false
-
-    console.log(`大纲数据已加载到大纲编辑器`)
-  }
-  catch (e) {
-    console.error(`应用大纲数据失败:`, e)
-  }
-}
-
-/* ---------- 使用大纲写内容 ---------- */
-function handleUseOutline(outline: OutlineData) {
-  try {
-    if (!outline || !outline.items || outline.items.length === 0) {
-      console.error(`大纲数据为空`)
-      return
-    }
-
-    // 将大纲转换为 Markdown 格式
-    let markdownContent = `# ${outline.topic}\n\n`
-
-    // 添加每个大纲项
-    outline.items.forEach((item, index) => {
-      markdownContent += `## ${index + 1}. ${item.title}\n\n`
-      if (item.content && item.content.trim()) {
-        markdownContent += `${item.content}\n\n`
-      }
-      else {
-        markdownContent += `<!-- TODO: 补充 ${item.title} 的内容 -->\n\n`
-      }
-    })
-
-    // 插入到编辑器（追加到末尾）
-    const currentEditor = (isHtmlMode?.value) ? htmlEditor?.value : editor?.value
-
-    if (currentEditor) {
-      const currentContent = currentEditor.state.doc.toString()
-      const insertPosition = currentContent.length
-
-      // 如果编辑器不为空，先添加换行，这个是非常关键的点
-      const prefix = currentContent.trim() ? `\n\n` : ``
-
-      currentEditor.dispatch({
-        changes: {
-          from: insertPosition,
-          insert: prefix + markdownContent,
-        },
-        selection: { anchor: insertPosition + prefix.length + markdownContent.length },
-      })
-    }
-    else {
-      // 如果没有编辑器实例，尝试获取当前内容并追加
-      // const currentContent = editorStore.getContent()
-      // if (currentContent.trim()) {
-      //   // 如果有内容，需要追加而不是替换
-      //   // 由于 importContent 会替换整个内容，我们需要手动组合内容
-      //   const newContent = `${currentContent}\n\n${markdownContent}`
-      //   editorStore.importContent(newContent)
-      // } else {
-      //   // 如果没有内容，直接导入
-      //   editorStore.importContent(markdownContent)
-      // }
-
-      // 这里直接做导入，不是追加
-      editorStore.importContent(markdownContent)
-    }
-
-    // 关闭大纲编辑器，显示聊天界面
-    outlineVisible.value = false
-
-    // 自动调用 AI 继续补充内容
-    const aiPrompt = `请根据以下大纲继续补充和完善文章内容，让每个章节都更加丰富和详细：
-
-${outline.items.map((item, index) => `${index + 1}. ${item.title}${item.content ? `\n   ${item.content}` : ``}`).join(`\n`)}
+${items.map((item: any, index: number) => `${index + 1}. ${item.title}${item.content ? `\n   ${item.content}` : ``}`).join(`\n`)}
 
 请按照大纲结构，为每个章节补充详细的内容，使文章完整、连贯、有深度。`
 
-    // 设置输入框内容并发送
-    input.value = aiPrompt
-    nextTick(() => {
-      sendMessage()
-    })
-
-    console.log(`大纲已插入编辑器，AI 正在补充详细的内容...`)
-  }
-  catch (e) {
-    console.error(`使用大纲失败:`, e)
-  }
+  input.value = aiPrompt
+  nextTick(() => {
+    sendMessage()
+  })
 }
 
 /* ---------- 图片下载 ---------- */
@@ -692,11 +491,6 @@ function handleSelectTask(task: any) {
   currentTask.value = task
 }
 
-const toolContext: ToolFunctionsContext = {
-  jimengConfig,
-  saveJimengConfig,
-}
-
 let storageInstance: IndexedDBTaskStorage | null = null
 
 function getTaskStorage(): IndexedDBTaskStorage {
@@ -718,72 +512,28 @@ function getModelConfig(): ModelConfig {
   }
 }
 
-async function startTaskWithStreaming(
-  userInstruction: string,
-  onChunk: (chunk: any) => void,
-) {
+function prepareTask() {
   const taskStorage = getTaskStorage()
-
   const taskId = currentTask.value?.id || nanoid()
   const projectId = currentProject.value?.id || ``
-
   const modelConfig = getModelConfig()
 
-  console.log(`[startTaskWithStreaming] Debug:`, {
-    isHtmlMode,
-    htmlEditor,
-    editor,
-    htmlEditorStoreRaw: htmlEditorStore,
-    htmlEditorFromStore: htmlEditorStore.htmlEditor,
-    isHtmlModeValue: isHtmlMode?.value,
-    htmlEditorValue: htmlEditor?.value,
-    editorValue: editor?.value,
-  })
-
-  const currentEditor = (isHtmlMode?.value) ? htmlEditor?.value : editor?.value
+  const currentEditor = getCurrentEditor()
   const taskContext: TaskContext = {
     modelConfig,
-    variables: {
-    },
+    variables: {},
     systemPromptBuilder: new SimplePromptBuilder(currentEditor?.state.doc.toString() || ``),
     tools: [
-      // new GenerateOutlineToolHandler(),
-      new WriteArticleToolHandler(),
+      new WriteArticleToolHandler(currentEditor, isHtmlMode?.value || false),
     ],
   }
 
-  const agent = new Agent(
+  return {
     taskId,
     projectId,
     modelConfig,
-    taskStorage,
     taskContext,
-  )
-
-  console.log(`[Task] Starting task:`, {
-    modelConfig,
-    taskId,
-    projectId,
-    instruction: userInstruction,
-  })
-
-  try {
-    const stream = agent.startTask(userInstruction)
-
-    for await (const chunk of stream) {
-      onChunk(chunk)
-    }
-
-    console.log(`[Task] Task completed successfully`)
-    return {
-      success: true,
-      taskId,
-      storage: taskStorage,
-    }
-  }
-  catch (error) {
-    console.error(`[Task] Task failed:`, error)
-    throw error
+    taskStorage,
   }
 }
 
@@ -793,15 +543,8 @@ async function sendMessage() {
     return
 
   const modelConfig = getModelConfig()
-  if (!modelConfig.agentModel || !modelConfig.agentModel.apiKey || !modelConfig.agentModel.baseUrl || !modelConfig.agentModel.modelName) {
-    const missingFields = []
-    if (!modelConfig.agentModel?.apiKey)
-      missingFields.push(`API Key`)
-    if (!modelConfig.agentModel?.baseUrl)
-      missingFields.push(`Base URL`)
-    if (!modelConfig.agentModel?.modelName)
-      missingFields.push(`Model Name`)
-    toast.error(`请先配置${missingFields.join(`、`)}`)
+  if (type.value !== `default` && !modelConfig.agentModel?.apiKey) {
+    toast.error(`请先配置 API Key`)
     return
   }
 
@@ -826,24 +569,40 @@ async function sendMessage() {
 
   loading.value = true
 
-  const taskId = currentTask.value?.id || nanoid()
-  if (!currentTask.value?.id) {
-    currentTask.value = { id: taskId, title: userMessage.substring(0, 50) }
-  }
-
-  console.log(`[sendMessage] Messages after push:`, messages.value)
-  console.log(`[sendMessage] Last message role:`, messages.value[messages.value.length - 1]?.role)
-
   fetchController.value = new AbortController()
 
   try {
+    const { taskId, projectId, modelConfig, taskContext, taskStorage } = prepareTask()
+
+    currentTaskContext.value = taskContext
+
+    if (!currentTask.value?.id) {
+      currentTask.value = { id: taskId, title: userMessage.substring(0, 50) }
+    }
+
+    const agent = new Agent(
+      taskId,
+      projectId,
+      modelConfig,
+      taskStorage,
+      taskContext,
+    )
     let toolName = ``
     let toolArguments = ``
-    await startTaskWithStreaming(userMessage, (chunk) => {
+    let currentToolCall: any = null
+    let toolHandler: any = null
+
+    const stream = agent.startTask(userMessage)
+    // core
+    for await (const chunk of stream) {
       console.log(chunk)
       console.log(`[sendMessage] Chunk type:`, chunk.type)
-      console.log(`[sendMessage] Chunk text:`, chunk.text)
-      console.log(`[sendMessage] Chunk reasoning:`, chunk.reasoning)
+      if (chunk.type === `text`) {
+        console.log(`[sendMessage] Chunk text:`, chunk.text)
+      }
+      if (chunk.type === `reasoning`) {
+        console.log(`[sendMessage] Chunk reasoning:`, chunk.reasoning)
+      }
       console.log(`[sendMessage] Messages length:`, messages.value.length)
 
       const lastIndex = messages.value.length - 1
@@ -869,60 +628,45 @@ async function sendMessage() {
         }
         else if (chunk.type === `tool_calls` && chunk.tool_call) {
           console.log(`[sendMessage] Tool call:`, chunk.tool_call)
+
+          if (currentToolCall && currentToolCall.function.name === chunk.tool_call.function.name) {
+            toolArguments += chunk.tool_call.function.arguments
+            currentToolCall.function.arguments += chunk.tool_call.function.arguments
+          }
+          else {
+            currentToolCall = { ...chunk.tool_call }
+            toolName = chunk.tool_call.function.name || ``
+            toolArguments = chunk.tool_call.function.arguments || ``
+          }
+
           const toolCallBlock: ContentBlock = {
             type: `tool_use`,
-            tool_use_id: chunk.tool_call.function.id,
-            name: chunk.tool_call.function.name,
-            input: chunk.tool_call.function.arguments,
-          }
-          if (toolCallBlock.name) {
-            toolName = toolCallBlock.name
-          }
-          if (toolCallBlock.input) {
-            toolArguments += toolCallBlock.input
-          }
-
-          if (toolName === `write_article`) {
-            if (!toolArguments) {
-              return
-            }
-            console.log(`[sendMessage] Tool arguments:`, toolArguments)
-            const repaired = parse(toolArguments)
-            console.log(`[repaired]: `, repaired)
-            const articleContent = repaired.content || ``
-            console.log(`[articleContent]: `, articleContent)
-
-            // 根据当前模式选择正确的编辑器
-            const currentEditor = (isHtmlMode?.value) ? htmlEditor?.value : editor?.value
-
-            if (currentEditor && articleContent) {
-              currentEditor.dispatch({
-                changes: {
-                  from: 0,
-                  to: currentEditor.state.doc.length,
-                  insert: articleContent,
-                },
-                selection: { anchor: articleContent.length },
-              })
-
-              console.log(`[write_artical] 文章内容已替换到编辑器 (${isHtmlMode?.value ? `HTML` : `Markdown`} 模式)`)
-            }
-            else if (articleContent) {
-              console.log(`[write_artical] 编辑器未就绪，保存待写入内容`)
-              pendingArticleContent.value = articleContent
-            }
-            else {
-              console.log(`[write_artical] 未写入编辑器:`, {
-                isHtmlMode: isHtmlMode?.value,
-                htmlEditorExists: !!htmlEditor?.value,
-                markdownEditorExists: !!editor?.value,
-                contentLength: articleContent?.length,
-              })
-            }
+            tool_use_id: currentToolCall.function.id,
+            name: toolName,
+            input: currentToolCall.function.arguments,
           }
 
           if (Array.isArray(lastMessage.content)) {
-            lastMessage.content.push(toolCallBlock)
+            const existingIndex = lastMessage.content.findIndex(
+              (block: ContentBlock) => block.type === `tool_use` && block.tool_use_id === toolCallBlock.tool_use_id,
+            )
+            if (existingIndex !== -1) {
+              lastMessage.content[existingIndex] = toolCallBlock
+            }
+            else {
+              lastMessage.content.push(toolCallBlock)
+            }
+            if (!toolHandler) {
+              const currentEditor = getCurrentEditor()
+              switch (toolName) {
+                case `write_article`:
+                  toolHandler = new WriteArticleToolHandler(currentEditor, isHtmlMode?.value || false)
+                  break
+                case `generate_outline`:
+                  toolHandler = new GenerateOutlineToolHandler()
+                  break
+              }
+            }
           }
           else {
             lastMessage.content = [toolCallBlock]
@@ -934,7 +678,19 @@ async function sendMessage() {
       else {
         console.log(`[sendMessage] ERROR: Last message is not assistant or is undefined!`)
       }
-    })
+    }
+
+    if (toolHandler && toolHandler.getConfig().humanInLoop) {
+      const parsedArguments = parse(toolArguments)
+      const toolCallWithParsedArgs = {
+        ...currentToolCall,
+        function: {
+          ...currentToolCall.function,
+          arguments: parsedArguments,
+        },
+      }
+      await toolHandler.execute(toolCallWithParsedArgs, taskContext)
+    }
 
     const lastIndex = messages.value.length - 1
     const lastMessage = messages.value[lastIndex]
@@ -1050,9 +806,12 @@ async function sendMessage() {
     </div>
 
     <!-- 大纲编辑器 -->
-    <div v-if="outlineVisible && !configVisible" class="ai-sidebar-outline flex-1 overflow-y-auto p-4">
-      <OutlineEditor v-model="outlineData" @use-outline="handleUseOutline" />
-    </div>
+    <OutlinePanel
+      v-if="outlineVisible && !configVisible"
+      ref="outlinePanelRef"
+      @use-outline="handleUseOutline"
+      @show-outline="() => { outlineVisible = true; configVisible = false }"
+    />
 
     <!-- 聊天内容 -->
     <div
@@ -1067,7 +826,8 @@ async function sendMessage() {
           :index="index"
           :is-last-message="index === messages.length - 1"
           :copied-index="copiedIndex"
-          @copy="copyToClipboard"
+          :task-context="currentTaskContext"
+          @on-copy="copyToClipboard"
           @edit="editMessage"
           @regenerate="regenerateLast"
           @apply-image="applyImageToEditor"
