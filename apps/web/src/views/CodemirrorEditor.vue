@@ -44,7 +44,7 @@ const { output } = storeToRefs(renderStore)
 const { isDark } = storeToRefs(uiStore)
 const { posts, currentPostIndex } = storeToRefs(postStore)
 const { previewWidth, theme } = storeToRefs(themeStore)
-const { isHtmlMode, htmlContent } = storeToRefs(htmlEditorStore)
+const { isHtmlMode, htmlContent, showHtmlEditor } = storeToRefs(htmlEditorStore)
 
 const {
   isMobile,
@@ -937,7 +937,7 @@ onUnmounted(() => {
           <ResizableHandle class="hidden md:block" />
           <ResizablePanel class="flex">
             <div
-              v-show="!isMobile || (isMobile && showEditor)"
+              v-show="(!isMobile || (isMobile && showEditor)) && (!isHtmlMode || showHtmlEditor)"
               ref="codeMirrorWrapper"
               class="codeMirror-wrapper relative flex-1"
               :class="{
@@ -1093,8 +1093,6 @@ onUnmounted(() => {
         </AlertDialogContent>
       </AlertDialog>
     </main>
-
-    <Footer />
   </div>
 </template>
 

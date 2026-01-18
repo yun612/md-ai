@@ -6,7 +6,7 @@ import {
   Check,
   Copy,
   FileText,
-  Image as ImageIcon,
+  History,
   MessageCircle,
   Pause,
   Plus,
@@ -20,6 +20,7 @@ import { parse } from 'partial-json'
 import { toast } from 'vue-sonner'
 import { IndexedDBTaskStorage } from '@/agents/indexeddb_storage'
 import AIConfig from '@/components/ai/chat-box/AIConfig.vue'
+import HistoryTasksPanel from '@/components/ai/chat-box/HistoryTasksPanel.vue'
 import MessageBlock from '@/components/ai/chat-box/MessageBlock.vue'
 import OutlinePanel from '@/components/ai/chat-box/OutlinePanel.vue'
 import { useHtmlEditorStore } from '@/components/editor/html-editor/useHtmlEditorStore'
@@ -56,6 +57,7 @@ const copiedIndex = ref<number | null>(null)
 const memoryKey = `ai_memory_context`
 const isQuoteAllContent = ref(false)
 const outlineVisible = ref(false)
+const historyTasksVisible = ref(false)
 const outlinePanelRef = ref<InstanceType<typeof OutlinePanel> | null>(null)
 
 /* ---------- 即梦API配置 ---------- */
@@ -128,33 +130,6 @@ function getTextFromContentBlocks(content: ContentBlock[]): string {
     .filter(block => block.type === `text` && block.text)
     .map(block => block.text)
     .join(``)
-}
-
-function formatDateTime(date: Date | string | undefined): string {
-  if (!date)
-    return ``
-  const d = new Date(date)
-  const now = new Date()
-  const diff = now.getTime() - d.getTime()
-  const days = Math.floor(diff / (1000 * 60 * 60 * 24))
-
-  if (days === 0) {
-    const hours = d.getHours().toString().padStart(2, `0`)
-    const minutes = d.getMinutes().toString().padStart(2, `0`)
-    return `今天 ${hours}:${minutes}`
-  }
-  else if (days === 1) {
-    return `昨天`
-  }
-  else if (days < 7) {
-    const weekdays = [`周日`, `周一`, `周二`, `周三`, `周四`, `周五`, `周六`]
-    return weekdays[d.getDay()]
-  }
-  else {
-    const month = (d.getMonth() + 1).toString().padStart(2, `0`)
-    const day = d.getDate().toString().padStart(2, `0`)
-    return `${month}-${day}`
-  }
 }
 
 async function loadTasks() {
@@ -766,10 +741,12 @@ async function sendMessage() {
           variant="ghost"
           size="icon"
           class="h-7 w-7"
-          title="AI 文生图"
-          @click="switchToImageGenerator()"
+          :title="historyTasksVisible ? 'AI 对话' : '历史任务'"
+          :class="{ 'bg-primary text-primary-foreground': historyTasksVisible }"
+          @click="historyTasksVisible = !historyTasksVisible"
         >
-          <ImageIcon class="h-4 w-4" />
+          <History v-if="!historyTasksVisible" class="h-4 w-4" />
+          <MessageCircle v-else class="h-4 w-4" />
         </Button>
         <Button
           variant="ghost"
@@ -795,31 +772,14 @@ async function sendMessage() {
       </div>
     </div>
 
-    <!-- 历史任务列表 -->
-    <div
-      v-if="!configVisible && !outlineVisible && tasks.length > 0"
-      class="ai-sidebar-tasks border-b bg-muted/20 px-3 py-2"
-    >
-      <div class="text-xs font-medium text-muted-foreground mb-2">
-        历史任务
-      </div>
-      <div class="space-y-1 max-h-24 overflow-y-auto">
-        <Button
-          v-for="task in tasks"
-          :key="task.id"
-          variant="ghost"
-          size="sm"
-          class="w-full justify-start h-auto py-1.5 px-2 text-xs flex-col items-start"
-          :class="{ 'bg-primary/10': currentTask?.id === task.id }"
-          @click="handleSelectTask(task)"
-        >
-          <span class="truncate font-medium">{{ task.name || task.description || '未命名任务' }}</span>
-          <span class="text-[10px] text-muted-foreground mt-0.5">
-            {{ formatDateTime(task.createdAt) }}
-          </span>
-        </Button>
-      </div>
-    </div>
+    <!-- 历史任务面板 -->
+    <HistoryTasksPanel
+      v-if="historyTasksVisible"
+      :tasks="tasks"
+      :current-task="currentTask"
+      @select-task="handleSelectTask"
+      @close="historyTasksVisible = false"
+    />
 
     <!-- 配置面板 -->
     <div v-if="configVisible" class="ai-sidebar-config border-b p-4">
@@ -836,7 +796,7 @@ async function sendMessage() {
 
     <!-- 聊天内容 -->
     <div
-      v-if="!configVisible && !outlineVisible"
+      v-if="!configVisible && !outlineVisible && !historyTasksVisible"
       class="ai-sidebar-chat-container ai-sidebar-chat flex-1 overflow-y-auto px-3 py-3"
     >
       <div class="space-y-3">

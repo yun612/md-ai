@@ -18,6 +18,11 @@ export const useRenderStore = defineStore(`render`, () => {
     chars: 0,
     words: 0,
     minutes: 0,
+    sections: 0,
+    colors: [] as Array<{
+      color: string
+      percentage: number
+    }>,
   })
 
   // 文章标题列表（用于生成目录）
@@ -130,6 +135,42 @@ export const useRenderStore = defineStore(`render`, () => {
     return bodyContent
   }
 
+  function calculateReadingStats(htmlContent: string) {
+    const tempDiv = document.createElement(`div`)
+    tempDiv.innerHTML = htmlContent
+    const textContent = tempDiv.textContent || ``
+
+    const chars = textContent.length
+    const minutes = Math.ceil(textContent.length / 400)
+
+    const sectionElements = tempDiv.querySelectorAll(`section`)
+    const sections = sectionElements.length
+
+    const colorMap = new Map<string, number>()
+    const allElements = tempDiv.querySelectorAll(`*`)
+    allElements.forEach((el) => {
+      const htmlEl = el as HTMLElement
+      const style = htmlEl.getAttribute(`style`)
+      if (style) {
+        const colorMatch = style.match(/color:\s*([^;]+)/i)
+        if (colorMatch && colorMatch[1]) {
+          const color = colorMatch[1].trim()
+          colorMap.set(color, (colorMap.get(color) || 0) + 1)
+        }
+      }
+    })
+
+    const totalStyledElements = Array.from(colorMap.values()).reduce((sum, count) => sum + count, 0)
+    const colors = Array.from(colorMap.entries())
+      .map(([color, count]) => ({
+        color,
+        percentage: totalStyledElements > 0 ? Math.round((count / totalStyledElements) * 100) : 0,
+      }))
+      .sort((a, b) => b.percentage - a.percentage)
+
+    return { chars, minutes, sections, colors }
+  }
+
   // 渲染内容
   const render = (content: string, options: any) => {
     const htmlEditorStore = useHtmlEditorStore()
@@ -143,19 +184,21 @@ export const useRenderStore = defineStore(`render`, () => {
         readingTime.chars = 0
         readingTime.words = 0
         readingTime.minutes = 0
+        readingTime.sections = 0
+        readingTime.colors = []
         titleList.value = []
         return output.value
       }
 
+      const stats = calculateReadingStats(bodyContent)
+      readingTime.chars = stats.chars
+      readingTime.words = 0
+      readingTime.minutes = stats.minutes
+      readingTime.sections = stats.sections
+      readingTime.colors = stats.colors
+
       const tempDiv = document.createElement(`div`)
       tempDiv.innerHTML = bodyContent
-      const textContent = tempDiv.textContent || ``
-      const words = textContent.trim().split(/\s+/).filter(word => word.length > 0).length
-      const minutes = Math.ceil(words / 200)
-
-      readingTime.chars = content.length
-      readingTime.words = words
-      readingTime.minutes = minutes
 
       const headingElements = tempDiv.querySelectorAll(`h1, h2, h3, h4, h5, h6`)
       titleList.value = []
@@ -199,9 +242,12 @@ export const useRenderStore = defineStore(`render`, () => {
 
     const { html: baseHtml, readingTime: readingTimeResult } = renderMarkdown(content, renderer)
 
-    readingTime.chars = content.length
-    readingTime.words = readingTimeResult.words
-    readingTime.minutes = Math.ceil(readingTimeResult.minutes)
+    const stats = calculateReadingStats(baseHtml)
+    readingTime.chars = stats.chars
+    readingTime.words = 0
+    readingTime.minutes = stats.minutes
+    readingTime.sections = stats.sections
+    readingTime.colors = stats.colors
 
     output.value = postProcessHtml(baseHtml, readingTimeResult, renderer)
 

@@ -10,6 +10,7 @@ export const useHtmlEditorStore = defineStore(`htmlEditor`, () => {
   const htmlContent = ref(``)
   const markdownContent = ref(``)
   const htmlEditor = ref<EditorView | null>(null)
+  const showHtmlEditor = useStorage(addPrefix(`show_html_editor`), true)
 
   const isHtmlMode = computed(() => editMode.value === `html`)
   const isMarkdownMode = computed(() => editMode.value === `markdown`)
@@ -26,6 +27,10 @@ export const useHtmlEditorStore = defineStore(`htmlEditor`, () => {
     editMode.value = editMode.value === `markdown` ? `html` : `markdown`
   }
 
+  function toggleHtmlEditor() {
+    showHtmlEditor.value = !showHtmlEditor.value
+  }
+
   function setHtmlContent(content: string) {
     htmlContent.value = content
   }
@@ -39,11 +44,13 @@ export const useHtmlEditorStore = defineStore(`htmlEditor`, () => {
     htmlContent,
     markdownContent,
     htmlEditor,
+    showHtmlEditor,
     isHtmlMode,
     isMarkdownMode,
     switchToHtml,
     switchToMarkdown,
     toggleEditMode,
+    toggleHtmlEditor,
     setHtmlContent,
     setMarkdownContent,
   }

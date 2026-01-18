@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Bot, ChevronDownIcon, Menu, Palette, SlidersHorizontal } from 'lucide-vue-next'
+import { Bot, ChevronDownIcon, Eye, EyeOff, Menu, Palette, SlidersHorizontal } from 'lucide-vue-next'
 import { HtmlEditorToolbar, useHtmlEditorStore } from '@/components/editor/html-editor'
 import { usePreviewStyleStore } from '@/components/editor/html-editor/usePreviewStyleStore'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -11,6 +11,7 @@ import { useThemeStore } from '@/stores/theme'
 import { useUIStore } from '@/stores/ui'
 import { addPrefix, generatePureHTML, processClipboardContent } from '@/utils'
 import FormatDropdown from './FormatDropdown.vue'
+import Statistic from './Statistic.vue'
 
 const emit = defineEmits([`startCopy`, `endCopy`])
 
@@ -29,7 +30,7 @@ const { output } = storeToRefs(renderStore)
 const { primaryColor } = storeToRefs(themeStore)
 const { isOpenRightSlider, isOpenAIPanel } = storeToRefs(uiStore)
 const { toggleAIPanel } = uiStore
-const { isHtmlMode, htmlContent } = storeToRefs(htmlEditorStore)
+const { isHtmlMode, htmlContent, showHtmlEditor } = storeToRefs(htmlEditorStore)
 const {
   type: aiServiceType,
   endpoint,
@@ -384,6 +385,9 @@ async function copy() {
 
     <!-- 右侧操作区 -->
     <div class="space-x-2 flex flex-wrap items-center">
+      <!-- 阅读时间统计 -->
+      <Statistic />
+
       <!-- 复制按钮组 -->
       <div
         class="bg-background space-x-1 text-background-foreground flex items-center border rounded-md"
@@ -443,6 +447,17 @@ async function copy() {
         @click="toggleAIPanel()"
       >
         <Bot class="size-4" />
+      </Button>
+
+      <!-- HTML编辑器切换按钮 -->
+      <Button
+        v-if="isHtmlMode"
+        variant="outline"
+        size="icon"
+        @click="htmlEditorStore.toggleHtmlEditor()"
+      >
+        <EyeOff v-if="showHtmlEditor" class="size-4" />
+        <Eye v-else class="size-4" />
       </Button>
 
       <!-- 样式面板 -->
