@@ -36,9 +36,18 @@ export class SimplePromptBuilder implements ISystemPromptBuilder {
   }
 
   async buildEnvironmentDetails(): Promise<string> {
+    const lines = this.articalContent.split(`\n`)
+    const numberedContent = lines
+      .map((line, index) => `${String(index + 1).padStart(6, ` `)} | ${line}`)
+      .join(`\n`)
+
     return `当前时间: ${new Date().toISOString()},
-文章内容: {},
-文章内容统计数据: {},
+文章内容统计数据: {
+  "length": ${this.articalContent.length},
+  "lines": ${lines.length}
+},
+文章内容: 
+${numberedContent}
 `
   }
 }

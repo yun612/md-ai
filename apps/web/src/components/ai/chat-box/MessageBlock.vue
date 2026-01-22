@@ -136,27 +136,6 @@ function getToolDisplayName(toolName: string): string {
 
   return toolName
 }
-
-// 解析工具输入参数
-function parseToolInput(input: any): Record<string, any> | null {
-  if (!input)
-    return null
-
-  if (typeof input === `string`) {
-    try {
-      return JSON.parse(input)
-    }
-    catch (e) {
-      return { raw: input }
-    }
-  }
-
-  if (typeof input === `object`) {
-    return input
-  }
-
-  return null
-}
 </script>
 
 <template>
@@ -196,7 +175,7 @@ function parseToolInput(input: any): Record<string, any> | null {
               v-for="(toolBlock, toolIndex) in getToolUseBlocks(msg.content || [])"
               :key="toolIndex"
               :tool-name="getToolDisplayName(toolBlock.name || '')"
-              :json-data="parseToolInput(toolBlock.input)"
+              :input="toolBlock.input"
             />
           </div>
         </div>

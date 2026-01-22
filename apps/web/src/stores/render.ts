@@ -177,16 +177,14 @@ export const useRenderStore = defineStore(`render`, () => {
     const isHtmlMode = htmlEditorStore.isHtmlMode
 
     if (isHtmlMode) {
+      // 检查内容是否为空或仅包含空白字符
+      if (!content || !content.trim()) {
+        return output.value
+      }
+
       const bodyContent = extractBodyFromHtml(content)
 
       if (!bodyContent) {
-        output.value = ``
-        readingTime.chars = 0
-        readingTime.words = 0
-        readingTime.minutes = 0
-        readingTime.sections = 0
-        readingTime.colors = []
-        titleList.value = []
         return output.value
       }
 

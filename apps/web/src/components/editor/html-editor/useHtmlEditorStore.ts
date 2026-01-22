@@ -1,6 +1,7 @@
 import type { EditorView } from '@codemirror/view'
 import { useStorage } from '@vueuse/core'
 import { addPrefix } from '@/utils'
+import { useDebouncedFormatter } from '@/utils/formatter'
 
 export type EditMode = `markdown` | `html`
 
@@ -11,6 +12,16 @@ export const useHtmlEditorStore = defineStore(`htmlEditor`, () => {
   const markdownContent = ref(``)
   const htmlEditor = ref<EditorView | null>(null)
   const showHtmlEditor = useStorage(addPrefix(`show_html_editor`), true)
+
+  const debouncedFormatter = useDebouncedFormatter((formatted) => {
+    if (htmlContent.value !== formatted) {
+      htmlContent.value = formatted
+    }
+  })
+
+  watch(htmlContent, (newContent) => {
+    debouncedFormatter(newContent)
+  })
 
   const isHtmlMode = computed(() => editMode.value === `html`)
   const isMarkdownMode = computed(() => editMode.value === `markdown`)

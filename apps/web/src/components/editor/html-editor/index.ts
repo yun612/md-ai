@@ -1,4 +1,6 @@
 export { default as HtmlEditorToolbar } from './HtmlEditorToolbar.vue'
 export { default as HtmlEditorView } from './HtmlEditorView.vue'
 export { default as HtmlPreviewPanel } from './HtmlPreviewPanel.vue'
+export { default as HtmlSandboxPanel } from './HtmlSandboxPanel.vue'
 export { useHtmlEditorStore } from './useHtmlEditorStore'
+export { SANDBOX_MODIFIED_ATTR, SANDBOX_MODIFIED_CLASS, useHtmlSandboxStore } from './useHtmlSandboxStore'

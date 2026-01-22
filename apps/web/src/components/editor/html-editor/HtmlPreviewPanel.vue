@@ -587,11 +587,11 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div>
+  <div class="h-full w-full">
     <div
       id="html-output"
       ref="previewRef"
-      class="html-preview-panel html-preview-content h-full overflow-y-auto bg-background relative p-4 w-full"
+      class="html-preview-panel html-preview-content h-full w-full overflow-y-auto bg-background relative p-4"
     />
     <Teleport to="body">
       <Transition

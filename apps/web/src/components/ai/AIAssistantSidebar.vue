@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ChatMessage as BaseChatMessage, ContentBlock, ModelConfig, TaskContext } from '@grisaiaevy/crafting-agent'
+import type { ApiStreamToolCall, ChatMessage as BaseChatMessage, ContentBlock, ModelConfig, TaskContext, ToolHandler } from '@grisaiaevy/crafting-agent'
 import { Agent } from '@grisaiaevy/crafting-agent'
 import {
   Bot,
@@ -24,6 +24,7 @@ import HistoryTasksPanel from '@/components/ai/chat-box/HistoryTasksPanel.vue'
 import MessageBlock from '@/components/ai/chat-box/MessageBlock.vue'
 import OutlinePanel from '@/components/ai/chat-box/OutlinePanel.vue'
 import { useHtmlEditorStore } from '@/components/editor/html-editor/useHtmlEditorStore'
+import { useHtmlSandboxStore } from '@/components/editor/html-editor/useHtmlSandboxStore'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { useAIConfigStore } from '@/stores/aiConfig'
@@ -31,12 +32,14 @@ import { useDisplayStore } from '@/stores/display'
 import { useEditorStore } from '@/stores/editor'
 import { useProjectStore } from '@/stores/project'
 import { copyPlain } from '@/utils/clipboard'
+import { ApplyDiffToolHandler } from '../../agents/apply_diff'
 import { GenerateOutlineToolHandler } from '../../agents/generate_outline'
 import { SimplePromptBuilder } from '../../agents/index'
 import { WriteArticleToolHandler } from '../../agents/write_article'
 
 const editorStore = useEditorStore()
 const htmlEditorStore = useHtmlEditorStore()
+const htmlSandboxStore = useHtmlSandboxStore()
 const { editor } = storeToRefs(editorStore)
 const { isHtmlMode } = storeToRefs(htmlEditorStore)
 const htmlEditor = computed(() => htmlEditorStore.htmlEditor)
@@ -300,7 +303,7 @@ function handleKeydown(e: KeyboardEvent) {
 
   if (e.key === `Enter` && !e.shiftKey) {
     e.preventDefault()
-    sendMessage()
+    startTask()
   }
   else if (e.key === `ArrowUp`) {
     e.preventDefault()
@@ -427,7 +430,7 @@ async function regenerateLast() {
     messages.value.splice(idx, 1)
   input.value = getTextFromContentBlocks(lastUser.content || [])
   await nextTick()
-  sendMessage()
+  startTask()
 }
 
 function handleUseOutline() {
@@ -441,7 +444,7 @@ ${items.map((item: any, index: number) => `${index + 1}. ${item.title}${item.con
 
   input.value = aiPrompt
   nextTick(() => {
-    sendMessage()
+    startTask()
   })
 }
 
@@ -487,20 +490,43 @@ function getModelConfig(): ModelConfig {
   }
 }
 
-function prepareTask() {
+function createToolHandlers(): ToolHandler[] {
+  const currentEditor = getCurrentEditor()
+  const sandboxConfig = {
+    createSandbox: htmlSandboxStore.createSandbox,
+    updateSandboxContent: htmlSandboxStore.updateSandboxContent,
+    markSectionAsModified: htmlSandboxStore.markSectionAsModified,
+    applyDiffResult: htmlSandboxStore.applyDiffResult,
+    sandboxContent: { value: htmlSandboxStore.sandboxContent },
+    isActive: { value: htmlSandboxStore.isActive },
+  }
+  const htmlContentGetter = () => htmlEditorStore.htmlContent
+
+  return [
+    new WriteArticleToolHandler(
+      currentEditor,
+      isHtmlMode?.value || false,
+      sandboxConfig,
+      htmlContentGetter,
+    ),
+    new GenerateOutlineToolHandler(sandboxConfig, htmlContentGetter),
+    new ApplyDiffToolHandler(sandboxConfig, htmlContentGetter),
+  ]
+}
+
+function prepareTask(tools: ToolHandler[]) {
   const taskStorage = getTaskStorage()
   const taskId = currentTask.value?.id || nanoid()
   const projectId = currentProject.value?.id || ``
   const modelConfig = getModelConfig()
 
   const currentEditor = getCurrentEditor()
+
   const taskContext: TaskContext = {
     modelConfig,
     variables: {},
     systemPromptBuilder: new SimplePromptBuilder(currentEditor?.state.doc.toString() || ``),
-    tools: [
-      new WriteArticleToolHandler(currentEditor, isHtmlMode?.value || false),
-    ],
+    tools,
   }
 
   return {
@@ -512,7 +538,7 @@ function prepareTask() {
   }
 }
 
-async function sendMessage() {
+async function startTask() {
   const userMessage = input.value.trim()
   if (!userMessage)
     return
@@ -547,7 +573,8 @@ async function sendMessage() {
   fetchController.value = new AbortController()
 
   try {
-    const { taskId, projectId, modelConfig, taskContext, taskStorage } = prepareTask()
+    const tools = createToolHandlers()
+    const { taskId, projectId, modelConfig, taskContext, taskStorage } = prepareTask(tools)
 
     currentTaskContext.value = taskContext
 
@@ -564,62 +591,33 @@ async function sendMessage() {
     )
     let toolName = ``
     let toolArguments = ``
-    let currentToolCall: any = null
-    let toolHandler: any = null
+    let currentToolCall: ApiStreamToolCall | undefined
+    let toolHandler: ToolHandler | undefined
 
     const stream = agent.startTask(userMessage)
     // core
     for await (const chunk of stream) {
-      console.log(chunk)
-      console.log(`[sendMessage] Chunk type:`, chunk.type)
-      if (chunk.type === `text`) {
-        console.log(`[sendMessage] Chunk text:`, chunk.text)
-      }
-      if (chunk.type === `reasoning`) {
-        console.log(`[sendMessage] Chunk reasoning:`, chunk.reasoning)
-      }
-      console.log(`[sendMessage] Messages length:`, messages.value.length)
-
       const lastIndex = messages.value.length - 1
       const lastMessage = messages.value[lastIndex]
-      console.log(`[sendMessage] Last message before update:`, lastMessage)
-      console.log(`[sendMessage] Last message role:`, lastMessage?.role)
 
       if (lastMessage?.role === `assistant`) {
         if (chunk.type === `text` && chunk.text) {
           const currentText = getTextFromContentBlocks(lastMessage.content || [])
-          console.log(`[sendMessage] Current text:`, currentText)
-          console.log(`[sendMessage] New text:`, currentText + chunk.text)
-
           const newContent = createTextContentBlock(currentText + chunk.text)
-          console.log(`[sendMessage] New content blocks:`, newContent)
-
           lastMessage.content = newContent
-          console.log(`[sendMessage] Last message after update:`, lastMessage)
-          console.log(`[sendMessage] Messages array last item:`, messages.value[lastIndex])
         }
         else if (chunk.type === `reasoning` && chunk.reasoning) {
           lastMessage.reasoning = (lastMessage.reasoning || ``) + chunk.reasoning
         }
         else if (chunk.type === `tool_calls` && chunk.tool_call) {
-          console.log(`[sendMessage] Tool call:`, chunk.tool_call)
-
-          if (currentToolCall && currentToolCall.function.name === chunk.tool_call.function.name) {
-            console.log(`[sendMessage] Continuing tool call for:`, chunk.tool_call.function.name)
-            console.log(`[sendMessage] Previous tool arguments:`, toolArguments)
-            console.log(`[sendMessage] New chunk arguments:`, chunk.tool_call.function.arguments)
+          if (currentToolCall && chunk.tool_call.function.arguments) {
             toolArguments += chunk.tool_call.function.arguments
             currentToolCall.function.arguments += chunk.tool_call.function.arguments
-            console.log(`[sendMessage] Updated tool arguments:`, toolArguments)
           }
           else {
-            console.log(`[sendMessage] New tool call detected`)
-            console.log(`[sendMessage] Previous tool call:`, currentToolCall)
             currentToolCall = { ...chunk.tool_call }
             toolName = chunk.tool_call.function.name || ``
             toolArguments = chunk.tool_call.function.arguments || ``
-            console.log(`[sendMessage] New tool name:`, toolName)
-            console.log(`[sendMessage] New tool arguments:`, toolArguments)
           }
 
           const toolCallBlock: ContentBlock = {
@@ -628,63 +626,70 @@ async function sendMessage() {
             name: toolName,
             input: currentToolCall.function.arguments,
           }
-          console.log(`[sendMessage] Tool call block created:`, toolCallBlock)
 
           if (Array.isArray(lastMessage.content)) {
-            console.log(`[sendMessage] Last message content is array, length:`, lastMessage.content.length)
             const existingIndex = lastMessage.content.findIndex(
               (block: ContentBlock) => block.type === `tool_use` && block.tool_use_id === toolCallBlock.tool_use_id,
             )
-            console.log(`[sendMessage] Existing tool call index:`, existingIndex)
             if (existingIndex !== -1) {
-              console.log(`[sendMessage] Updating existing tool call at index:`, existingIndex)
               lastMessage.content[existingIndex] = toolCallBlock
             }
             else {
-              console.log(`[sendMessage] Adding new tool call to content`)
               lastMessage.content.push(toolCallBlock)
             }
             if (!toolHandler) {
-              console.log(`[sendMessage] Creating tool handler for:`, toolName)
-              const currentEditor = getCurrentEditor()
-              switch (toolName) {
-                case `write_article`:
-                  toolHandler = new WriteArticleToolHandler(currentEditor, isHtmlMode?.value || false)
-                  console.log(`[sendMessage] WriteArticleToolHandler created`)
-                  break
-                case `generate_outline`:
-                  toolHandler = new GenerateOutlineToolHandler()
-                  console.log(`[sendMessage] GenerateOutlineToolHandler created`)
-                  break
-                default:
-                  console.log(`[sendMessage] No handler for tool:`, toolName)
-              }
+              toolHandler = tools.find(t => t.getConfig().displayName === toolName)
             }
             if (toolHandler && toolHandler.getConfig().humanInLoop) {
-              const parsedArguments = toolArguments ? parse(toolArguments) : {}
-              const toolCallWithParsedArgs = {
-                ...currentToolCall,
-                function: {
-                  ...currentToolCall.function,
-                  arguments: parsedArguments,
-                },
+              try {
+                const parsedArguments = toolArguments ? parse(toolArguments) : {}
+                const toolCallWithParsedArgs = {
+                  ...currentToolCall,
+                  function: {
+                    ...currentToolCall.function,
+                    arguments: parsedArguments,
+                  },
+                }
+                await toolHandler.execute(toolCallWithParsedArgs, {
+                  taskContext,
+                  isPartial: true,
+                })
               }
-              await toolHandler.execute(toolCallWithParsedArgs, taskContext)
-            }
-            else {
-              console.log(`[sendMessage] Tool handler already exists`)
+              catch (error) {
+                console.log(`[sendMessage] parse tool arguments error:`, error)
+                console.log(`[sendMessage] toolArguments:`, toolArguments)
+              }
             }
           }
           else {
-            console.log(`[sendMessage] Last message content is not array, replacing with array`)
             lastMessage.content = [toolCallBlock]
           }
-          console.log(`[sendMessage] Last message after tool call:`, lastMessage)
         }
         scrollToBottom()
       }
       else {
         console.log(`[sendMessage] ERROR: Last message is not assistant or is undefined!`)
+      }
+    }
+    // after stream
+    if (currentToolCall && toolHandler && toolHandler.getConfig().humanInLoop) {
+      try {
+        const parsedArguments = toolArguments ? parse(toolArguments) : {}
+        const toolCallWithParsedArgs = {
+          ...currentToolCall,
+          function: {
+            ...currentToolCall.function,
+            arguments: parsedArguments,
+          },
+        }
+        await toolHandler.execute(toolCallWithParsedArgs, {
+          taskContext,
+          isPartial: false,
+        })
+      }
+      catch (error) {
+        console.log(`[sendMessage] parse tool arguments error:`, error)
+        console.log(`[sendMessage] toolArguments:`, toolArguments)
       }
     }
 
@@ -861,7 +866,7 @@ async function sendMessage() {
             size="icon"
             class="absolute bottom-2 right-2 h-7 w-7 rounded-full"
             :aria-label="loading ? '暂停' : '发送'"
-            @click="loading ? pauseStreaming() : sendMessage()"
+            @click="loading ? pauseStreaming() : startTask()"
           >
             <Pause v-if="loading" class="h-4 w-4" />
             <Send v-else class="h-4 w-4" />

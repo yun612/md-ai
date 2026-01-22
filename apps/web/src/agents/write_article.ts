@@ -1,15 +1,34 @@
-import type { TaskContext, ToolHandler } from '@grisaiaevy/crafting-agent'
+import type { ToolContext, ToolHandler } from '@grisaiaevy/crafting-agent'
+import type { HtmlSandbox } from './apply_diff'
 
 export class WriteArticleToolHandler implements ToolHandler {
   private editor: any
   private isHtmlMode: boolean
   private pendingArticleContent: string | null = null
   private editorReady: boolean = false
+  private sandbox: HtmlSandbox | null = null
+  private htmlContentGetter: (() => string) | null = null
 
-  constructor(editor: any, isHtmlMode: boolean = false) {
+  constructor(editor: any, isHtmlMode: boolean = false, sandbox?: HtmlSandbox, htmlContentGetter?: () => string) {
     this.editor = editor
     this.isHtmlMode = isHtmlMode
+    this.sandbox = sandbox || null
+    this.htmlContentGetter = htmlContentGetter || null
     this.setupEditorWatch()
+  }
+
+  /**
+   * 设置 Sandbox 实例
+   */
+  setSandbox(sandbox: HtmlSandbox): void {
+    this.sandbox = sandbox
+  }
+
+  /**
+   * 设置获取 HTML 内容的函数
+   */
+  setHtmlContentGetter(getter: () => string): void {
+    this.htmlContentGetter = getter
   }
 
   private setupEditorWatch() {
@@ -57,6 +76,7 @@ export class WriteArticleToolHandler implements ToolHandler {
   getConfig() {
     return {
       humanInLoop: true,
+      displayName: `write_article`,
     }
   }
 
@@ -80,7 +100,7 @@ export class WriteArticleToolHandler implements ToolHandler {
     }
   }
 
-  async execute(toolCall: any, _context?: TaskContext): Promise<string> {
+  async execute(toolCall: any, _context?: ToolContext): Promise<string> {
     console.log(`[WriteArticleTool] Executing:`, toolCall)
     const args = typeof toolCall.function.arguments === `string`
       ? JSON.parse(toolCall.function.arguments)
@@ -88,6 +108,18 @@ export class WriteArticleToolHandler implements ToolHandler {
 
     const content = args.content || ``
     console.log(`[WriteArticleTool] Content to write:`, content)
+
+    if (this.isHtmlMode && (this.sandbox || this.htmlContentGetter)) {
+      console.log(`[WriteArticleTool] Using Sandbox for HTML content`)
+      if (this.sandbox) {
+        if (!this.sandbox.isActive.value && this.htmlContentGetter) {
+          const originalContent = this.htmlContentGetter()
+          this.sandbox.createSandbox(originalContent)
+        }
+        this.sandbox.updateSandboxContent(content)
+      }
+      return `Write article executed (Sandbox): ${content.substring(0, 50)}...`
+    }
 
     if (!this.editor) {
       console.log(`[WriteArticleTool] Editor not available, storing content as pending`)

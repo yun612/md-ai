@@ -10,7 +10,7 @@ import imageCompression from 'browser-image-compression'
 import { Eye, Palette, Pen } from 'lucide-vue-next'
 import { SidebarAIToolbar } from '@/components/ai'
 import AIAssistantSidebar from '@/components/ai/AIAssistantSidebar.vue'
-import { HtmlEditorView, HtmlPreviewPanel, useHtmlEditorStore } from '@/components/editor/html-editor'
+import { HtmlEditorView, HtmlPreviewPanel, HtmlSandboxPanel, useHtmlEditorStore, useHtmlSandboxStore } from '@/components/editor/html-editor'
 import TemplateGallery from '@/components/editor/TemplateGallery.vue'
 
 import { Button } from '@/components/ui/button'
@@ -38,6 +38,7 @@ const uiStore = useUIStore()
 const cssEditorStore = useCssEditorStore()
 const displayStore = useDisplayStore()
 const htmlEditorStore = useHtmlEditorStore()
+const htmlSandboxStore = useHtmlSandboxStore()
 
 const { editor } = storeToRefs(editorStore)
 const { output } = storeToRefs(renderStore)
@@ -45,6 +46,7 @@ const { isDark } = storeToRefs(uiStore)
 const { posts, currentPostIndex } = storeToRefs(postStore)
 const { previewWidth, theme } = storeToRefs(themeStore)
 const { isHtmlMode, htmlContent, showHtmlEditor } = storeToRefs(htmlEditorStore)
+const { isActive: isSandboxActive, showSandboxPanel } = storeToRefs(htmlSandboxStore)
 
 const {
   isMobile,
@@ -1010,16 +1012,16 @@ onUnmounted(() => {
                     class="preview border-x shadow-xl h-full"
                     :class="[isMobile ? 'w-[100%]' : previewWidth]"
                   >
-                    <section id="output" class="w-full">
+                    <section id="output" class="w-full h-full">
                       <HtmlPreviewPanel :html-content="htmlContent" />
                     </section>
                   </div>
                   <div
                     v-else
-                    class="preview border-x shadow-xl"
+                    class="preview border-x shadow-xl h-full"
                     :class="[isMobile ? 'w-[100%]' : previewWidth]"
                   >
-                    <section id="output" class="w-full" v-html="output" />
+                    <section id="output" class="w-full h-full" v-html="output" />
                     <div v-if="isCoping" class="loading-mask">
                       <div class="loading-mask-box">
                         <div class="loading__img" />
@@ -1039,6 +1041,19 @@ onUnmounted(() => {
             </div>
             <CssEditor />
             <RightSlider />
+          </ResizablePanel>
+          <!-- Sandbox 预览面板 - 位于原预览面板和 AI 对话框之间 -->
+          <ResizableHandle
+            v-if="isSandboxActive && showSandboxPanel && isHtmlMode"
+            class="hidden md:block"
+          />
+          <ResizablePanel
+            v-if="isSandboxActive && showSandboxPanel && isHtmlMode"
+            :default-size="20"
+            :min-size="15"
+            :max-size="35"
+          >
+            <HtmlSandboxPanel />
           </ResizablePanel>
           <ResizableHandle
             v-if="isOpenAIPanel"

@@ -3,25 +3,25 @@ import { computed, ref } from 'vue'
 
 interface Props {
   toolName: string
-  jsonData: Record<string, any> | null
+  input: any
 }
 
 const props = defineProps<Props>()
 
 const isExpanded = ref(false)
 
-function formatJson(data: Record<string, any> | null): string {
-  if (!data)
+const fullInputString = computed(() => {
+  if (!props.input)
     return ``
+  if (typeof props.input === `string`)
+    return props.input
   try {
-    return JSON.stringify(data, null, 2)
+    return JSON.stringify(props.input, null, 2)
   }
   catch (e) {
-    return String(data)
+    return String(props.input)
   }
-}
-
-const fullJsonString = computed(() => formatJson(props.jsonData))
+})
 
 function toggleExpand() {
   isExpanded.value = !isExpanded.value
@@ -48,10 +48,10 @@ function toggleExpand() {
           class="text-xs bg-muted/50 p-2 rounded-b-md overflow-x-auto whitespace-pre-wrap break-words"
           :class="isExpanded ? '' : 'line-clamp-2'"
           :style="isExpanded ? '' : { maxHeight: '3rem', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }"
-        >{{ fullJsonString || '...' }}</pre>
+        >{{ fullInputString || '...' }}</pre>
       </div>
       <div
-        v-if="fullJsonString.length > 100"
+        v-if="fullInputString.length > 100"
         class="text-[10px] text-muted-foreground/60 px-2 pb-1 text-center cursor-pointer hover:text-muted-foreground transition-colors"
         @click="toggleExpand"
       >
