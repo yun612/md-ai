@@ -126,17 +126,68 @@ defineExpose({
   />
 </template>
 
-    <style scoped>
-    .html-editor-container {
+<style scoped>
+.html-editor-container {
   font-size: 14px;
   line-height: 1.6;
+  border-radius: 12px;
+  overflow: hidden;
+  background: hsl(var(--background));
+  transition: all 0.3s ease;
 }
 
 .html-editor-container :deep(.cm-editor) {
   height: 100%;
+  border-radius: 12px;
+  overflow: hidden;
 }
 
 .html-editor-container :deep(.cm-scroller) {
-  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 13px;
+  line-height: 1.7;
+  padding: 16px;
+}
+
+.html-editor-container :deep(.cm-content) {
+  padding: 8px 0;
+}
+
+.html-editor-container :deep(.cm-gutters) {
+  border-radius: 12px 0 0 12px;
+  border-right: 1px solid hsl(var(--border));
+  background: hsl(var(--muted) / 0.3);
+}
+
+.html-editor-container :deep(.cm-activeLineGutter) {
+  background: hsl(var(--primary) / 0.1);
+}
+
+.html-editor-container :deep(.cm-activeLine) {
+  background: hsl(var(--primary) / 0.05);
+}
+
+/* 选中文本样式 */
+.html-editor-container :deep(.cm-selectionBackground) {
+  background: hsl(var(--primary) / 0.2) !important;
+}
+
+/* 滚动条样式 */
+.html-editor-container :deep(.cm-scroller)::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.html-editor-container :deep(.cm-scroller)::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.html-editor-container :deep(.cm-scroller)::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground) / 0.3);
+  border-radius: 4px;
+}
+
+.html-editor-container :deep(.cm-scroller)::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.5);
 }
 </style>

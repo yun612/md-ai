@@ -874,12 +874,27 @@ async function startTask() {
 <style scoped>
 .ai-sidebar {
   font-family:
-    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans',
-    'Helvetica Neue', sans-serif;
+    'Inter',
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    'Roboto',
+    'Oxygen',
+    'Ubuntu',
+    'Cantarell',
+    'Fira Sans',
+    'Droid Sans',
+    'Helvetica Neue',
+    sans-serif;
+  border-radius: 12px;
+  overflow: hidden;
 }
 
 .ai-sidebar-header {
-  min-height: 48px;
+  min-height: 52px;
+  background: linear-gradient(135deg, hsl(var(--primary) / 0.05), transparent);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid hsl(var(--border) / 0.5);
 }
 
 .ai-sidebar-chat-container {
@@ -920,11 +935,12 @@ async function startTask() {
 .ai-sidebar-chat-container pre {
   overflow-x: auto;
   max-width: 100%;
-  padding: 0.75rem;
-  border-radius: 0.375rem;
+  padding: 0.875rem;
+  border-radius: 10px;
   background-color: hsl(var(--muted));
   margin: 0.5rem 0;
   word-wrap: break-word;
+  border: 1px solid hsl(var(--border) / 0.3);
 }
 
 .ai-sidebar-chat-container code {
@@ -932,6 +948,8 @@ async function startTask() {
   overflow-wrap: break-word;
   white-space: pre-wrap;
   max-width: 100%;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', monospace;
+  font-size: 0.85em;
 }
 
 .ai-sidebar-chat-container pre code {
@@ -961,10 +979,83 @@ async function startTask() {
 .ai-sidebar-chat-container img {
   max-width: 100%;
   height: auto;
-  border-radius: 0.5rem;
+  border-radius: 10px;
   margin: 1rem 0;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   display: block;
   border: 1px solid hsl(var(--border) / 0.3);
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.ai-sidebar-chat-container img:hover {
+  transform: scale(1.02);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+}
+
+/* 输入区域样式 */
+.ai-sidebar-input {
+  background: linear-gradient(180deg, transparent, hsl(var(--background)));
+  backdrop-filter: blur(8px);
+}
+
+.ai-sidebar-input :deep(textarea) {
+  border-radius: 12px;
+  transition: all 0.2s ease;
+}
+
+.ai-sidebar-input :deep(textarea:focus) {
+  box-shadow: 0 0 0 3px hsl(var(--primary) / 0.1);
+}
+
+/* 配置面板样式 */
+.ai-sidebar-config {
+  background: linear-gradient(135deg, hsl(var(--muted) / 0.3), transparent);
+  border-radius: 0 0 12px 12px;
+}
+
+/* 按钮动画 */
+.ai-sidebar :deep(button) {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.ai-sidebar :deep(button:hover) {
+  transform: translateY(-1px);
+}
+
+.ai-sidebar :deep(button:active) {
+  transform: translateY(0);
+}
+
+/* 消息动画 */
+@keyframes messageSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.ai-sidebar-chat-container .space-y-3 > div {
+  animation: messageSlideIn 0.3s ease-out;
+}
+
+/* AI 正在输入动画 */
+@keyframes typingPulse {
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.ai-sidebar .typing-indicator {
+  animation: typingPulse 1.5s ease-in-out infinite;
 }
 </style>

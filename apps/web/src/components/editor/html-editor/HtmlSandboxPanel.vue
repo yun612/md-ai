@@ -122,18 +122,32 @@ function handleDiscard() {
 .html-sandbox-panel {
   min-width: 300px;
   font-family:
-    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans',
-    'Helvetica Neue', sans-serif;
+    'Inter',
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    'Roboto',
+    'Oxygen',
+    'Ubuntu',
+    'Cantarell',
+    'Fira Sans',
+    'Droid Sans',
+    'Helvetica Neue',
+    sans-serif;
+  border-radius: 12px;
+  overflow: hidden;
 }
 
 .sandbox-header {
-  min-height: 40px;
+  min-height: 48px;
   background: linear-gradient(135deg, rgba(251, 191, 36, 0.1), rgba(245, 158, 11, 0.05));
+  backdrop-filter: blur(8px);
 }
 
 .sandbox-preview-container {
   scrollbar-width: thin;
   scrollbar-color: rgba(156, 163, 175, 0.3) transparent;
+  border-radius: 0 0 12px 12px;
 }
 
 .sandbox-preview-container::-webkit-scrollbar {
@@ -149,61 +163,66 @@ function handleDiscard() {
   border-radius: 3px;
 }
 
+.sandbox-preview-container::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(156, 163, 175, 0.5);
+}
+
 .sandbox-preview-content {
   max-width: 100%;
   word-wrap: break-word;
+  border-radius: 8px;
 }
 
 .sandbox-preview-content :deep(img) {
   max-width: 100%;
   height: auto;
+  border-radius: 8px;
 }
 
 .sandbox-preview-content :deep(pre) {
   overflow-x: auto;
   padding: 1em;
-  background: #f5f5f5;
-  border-radius: 4px;
+  background: hsl(var(--muted));
+  border-radius: 8px;
 }
 
 .sandbox-preview-content :deep(code) {
-  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace;
 }
 
 /* 修改标记样式 */
 .sandbox-preview-content :deep(.sandbox-modified-section) {
   position: relative;
   outline: 2px dashed rgba(251, 191, 36, 0.8) !important;
-  outline-offset: 2px;
+  outline-offset: 4px;
   background: linear-gradient(135deg, rgba(251, 191, 36, 0.1) 0%, rgba(245, 158, 11, 0.05) 100%) !important;
-  transition: all 0.3s ease-out;
+  border-radius: 8px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .sandbox-preview-content :deep(.sandbox-modified-section)::before {
   content: '已修改';
   position: absolute;
-  top: -8px;
-  right: -8px;
+  top: -10px;
+  right: -10px;
   font-size: 10px;
-  padding: 2px 6px;
+  padding: 3px 8px;
   background: linear-gradient(135deg, #fbbf24, #f59e0b);
   color: white;
-  border-radius: 4px;
-  font-weight: 500;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  border-radius: 6px;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(251, 191, 36, 0.3);
   z-index: 10;
 }
 
 /* 深色模式 */
-@media (prefers-color-scheme: dark) {
-  .sandbox-header {
-    background: linear-gradient(135deg, rgba(251, 191, 36, 0.15), rgba(245, 158, 11, 0.1));
-  }
+.dark .sandbox-header {
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.15), rgba(245, 158, 11, 0.1));
+}
 
-  .sandbox-preview-content :deep(.sandbox-modified-section) {
-    outline-color: rgba(251, 191, 36, 0.9) !important;
-    background: linear-gradient(135deg, rgba(251, 191, 36, 0.15) 0%, rgba(245, 158, 11, 0.1) 100%) !important;
-  }
+.dark .sandbox-preview-content :deep(.sandbox-modified-section) {
+  outline-color: rgba(251, 191, 36, 0.9) !important;
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.15) 0%, rgba(245, 158, 11, 0.1) 100%) !important;
 }
 
 /* 修改区域的动画效果 */
@@ -215,9 +234,20 @@ function handleDiscard() {
   0%,
   100% {
     outline-color: rgba(251, 191, 36, 0.6);
+    box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.2);
   }
   50% {
     outline-color: rgba(251, 191, 36, 1);
+    box-shadow: 0 0 0 4px rgba(251, 191, 36, 0.1);
   }
+}
+
+/* 按钮悬停效果 */
+.sandbox-header :deep(button) {
+  transition: all 0.2s ease;
+}
+
+.sandbox-header :deep(button:hover) {
+  transform: translateY(-1px);
 }
 </style>

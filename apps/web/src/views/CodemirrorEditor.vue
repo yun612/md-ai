@@ -7,11 +7,11 @@ import { highlightPendingBlocks, hljs } from '@md/core'
 import { themeMap } from '@md/shared/configs'
 import { theme as codeMirrorTheme, markdownSetup, truncateBase64Images } from '@md/shared/editor'
 import imageCompression from 'browser-image-compression'
-import { Eye, Palette, Pen } from 'lucide-vue-next'
-import { SidebarAIToolbar } from '@/components/ai'
+import { Eye, Pen } from 'lucide-vue-next'
 import AIAssistantSidebar from '@/components/ai/AIAssistantSidebar.vue'
 import { HtmlEditorView, HtmlPreviewPanel, HtmlSandboxPanel, useHtmlEditorStore, useHtmlSandboxStore } from '@/components/editor/html-editor'
 import TemplateGallery from '@/components/editor/TemplateGallery.vue'
+import LeftNavSidebar from '@/components/layout/LeftNavSidebar.vue'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -917,135 +917,145 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="container flex flex-col">
-    <Progress v-model="progressValue" class="absolute left-0 right-0 rounded-none" style="height: 2px;" />
-    <EditorHeader
+  <div class="app-container">
+    <!-- 左侧导航栏 (桌面端) -->
+    <LeftNavSidebar
       @start-copy="startCopy"
       @end-copy="endCopy"
+      @toggle-template-gallery="toggleTemplateGallery"
     />
 
-    <main class="container-main flex flex-1 flex-col">
-      <div
-        class="container-main-section border-radius-10 relative flex flex-1 overflow-hidden border"
-      >
-        <ResizablePanelGroup direction="horizontal">
+    <!-- 移动端顶部工具栏 -->
+    <div v-if="isMobile" class="mobile-header">
+      <EditorHeader
+        @start-copy="startCopy"
+        @end-copy="endCopy"
+      />
+    </div>
+
+    <!-- 主内容区域 -->
+    <div class="main-content" :class="{ 'has-mobile-header': isMobile }">
+      <Progress v-model="progressValue" class="absolute left-0 right-0 top-0 z-50 rounded-none" style="height: 2px;" />
+
+      <!-- 编辑区容器 -->
+      <div class="editor-container">
+        <ResizablePanelGroup direction="horizontal" class="h-full">
+          <!-- 文档列表面板 -->
           <ResizablePanel
             :default-size="15"
-            :max-size="isOpenPostSlider ? 30 : 0"
-            :min-size="isOpenPostSlider ? 10 : 0"
+            :max-size="isOpenPostSlider ? 25 : 0"
+            :min-size="isOpenPostSlider ? 12 : 0"
           >
-            <PostSlider />
+            <div class="panel-wrapper post-slider-panel">
+              <PostSlider />
+            </div>
           </ResizablePanel>
-          <ResizableHandle class="hidden md:block" />
-          <ResizablePanel class="flex">
+          <ResizableHandle v-if="isOpenPostSlider" class="panel-handle" />
+
+          <!-- 编辑器面板 -->
+          <ResizablePanel class="flex min-w-0">
             <div
               v-show="(!isMobile || (isMobile && showEditor)) && (!isHtmlMode || showHtmlEditor)"
               ref="codeMirrorWrapper"
-              class="codeMirror-wrapper relative flex-1"
+              class="editor-panel"
               :class="{
-                'order-1 border-l': !isEditOnLeft,
-                'border-r': isEditOnLeft,
+                'order-1': !isEditOnLeft,
               }"
             >
-              <div class="template-toggle absolute left-3 top-3 z-30 flex gap-2">
-                <Button size="sm" variant="secondary" class="shadow-sm" @click="toggleTemplateGallery">
-                  <Palette class="mr-1 h-4 w-4" />
-                  精美模板
-                </Button>
-                <Button
+              <div class="panel-wrapper">
+                <!-- 模板画廊返回按钮 -->
+                <div v-if="showTemplateGallery" class="template-toggle">
+                  <Button size="sm" variant="outline" class="shadow-sm" @click="closeTemplateGallery">
+                    返回编辑
+                  </Button>
+                </div>
+
+                <TemplateGallery
                   v-if="showTemplateGallery"
-                  size="sm"
-                  variant="outline"
-                  class="shadow-sm"
-                  @click="closeTemplateGallery"
-                >
-                  返回编辑
-                </Button>
-              </div>
-
-              <TemplateGallery
-                v-if="showTemplateGallery"
-                :current-theme="theme"
-                @apply="applyTemplateFromGallery"
-                @close="closeTemplateGallery"
-              />
-
-              <template v-else>
-                <SearchTab v-if="codeMirrorView && !isHtmlMode" ref="searchTabRef" :editor-view="codeMirrorView as any" />
-                <SidebarAIToolbar
-                  :is-mobile="isMobile"
-                  :show-editor="showEditor"
+                  :current-theme="theme"
+                  @apply="applyTemplateFromGallery"
+                  @close="closeTemplateGallery"
                 />
 
-                <EditorContextMenu v-if="!isHtmlMode">
-                  <div
-                    id="editor"
-                    ref="editorRef"
-                    class="codemirror-container"
-                  />
-                </EditorContextMenu>
-                <div v-else class="html-editor-wrapper h-full">
-                  <HtmlEditorView
-                    ref="htmlEditorRef"
-                    @content-change="handleHtmlContentChange"
-                  />
-                </div>
-              </template>
+                <template v-else>
+                  <SearchTab v-if="codeMirrorView && !isHtmlMode" ref="searchTabRef" :editor-view="codeMirrorView as any" />
+
+                  <EditorContextMenu v-if="!isHtmlMode">
+                    <div
+                      id="editor"
+                      ref="editorRef"
+                      class="codemirror-container"
+                    />
+                  </EditorContextMenu>
+                  <div v-else class="html-editor-wrapper h-full">
+                    <HtmlEditorView
+                      ref="htmlEditorRef"
+                      @content-change="handleHtmlContentChange"
+                    />
+                  </div>
+                </template>
+              </div>
             </div>
+
+            <!-- 预览面板 -->
             <div
               v-show="!isMobile || (isMobile && !showEditor)"
-              class="relative flex-1 overflow-x-hidden transition-width"
-              :class="[isOpenRightSlider ? 'w-0' : 'w-100']"
+              class="preview-panel"
+              :class="[isOpenRightSlider ? 'w-0' : 'flex-1']"
             >
-              <div
-                id="preview"
-                ref="previewRef"
-                class="preview-wrapper w-full p-5"
-              >
+              <div class="panel-wrapper">
                 <div
-                  id="output-wrapper"
-                  class="w-full"
-                  :class="{ output_night: !backLight }"
+                  id="preview"
+                  ref="previewRef"
+                  class="preview-wrapper w-full p-5"
                 >
                   <div
-                    v-if="isHtmlMode"
-                    class="preview border-x shadow-xl h-full"
-                    :class="[isMobile ? 'w-[100%]' : previewWidth]"
+                    id="output-wrapper"
+                    class="w-full"
+                    :class="{ output_night: !backLight }"
                   >
-                    <section id="output" class="w-full h-full">
-                      <HtmlPreviewPanel :html-content="htmlContent" />
-                    </section>
-                  </div>
-                  <div
-                    v-else
-                    class="preview border-x shadow-xl h-full"
-                    :class="[isMobile ? 'w-[100%]' : previewWidth]"
-                  >
-                    <section id="output" class="w-full h-full" v-html="output" />
-                    <div v-if="isCoping" class="loading-mask">
-                      <div class="loading-mask-box">
-                        <div class="loading__img" />
-                        <span>正在生成</span>
+                    <div
+                      v-if="isHtmlMode"
+                      class="preview shadow-lg h-full"
+                      :class="[isMobile ? 'w-[100%]' : previewWidth]"
+                    >
+                      <section id="output" class="w-full h-full">
+                        <HtmlPreviewPanel :html-content="htmlContent" />
+                      </section>
+                    </div>
+                    <div
+                      v-else
+                      class="preview shadow-lg h-full"
+                      :class="[isMobile ? 'w-[100%]' : previewWidth]"
+                    >
+                      <section id="output" class="w-full h-full" v-html="output" />
+                      <div v-if="isCoping" class="loading-mask">
+                        <div class="loading-mask-box">
+                          <div class="loading__img" />
+                          <span>正在生成</span>
+                        </div>
                       </div>
                     </div>
                   </div>
+                  <BackTop
+                    target="preview"
+                    :right="isMobile ? 24 : 20"
+                    :bottom="isMobile ? 90 : 20"
+                  />
                 </div>
-                <BackTop
-                  target="preview"
-                  :right="isMobile ? 24 : 20"
-                  :bottom="isMobile ? 90 : 20"
-                />
-              </div>
 
-              <FloatingToc />
+                <FloatingToc />
+              </div>
             </div>
+
             <CssEditor />
             <RightSlider />
           </ResizablePanel>
-          <!-- Sandbox 预览面板 - 位于原预览面板和 AI 对话框之间 -->
+
+          <!-- Sandbox 预览面板 -->
           <ResizableHandle
             v-if="isSandboxActive && showSandboxPanel && isHtmlMode"
-            class="hidden md:block"
+            class="panel-handle"
           />
           <ResizablePanel
             v-if="isSandboxActive && showSandboxPanel && isHtmlMode"
@@ -1053,29 +1063,33 @@ onUnmounted(() => {
             :min-size="15"
             :max-size="35"
           >
-            <HtmlSandboxPanel />
+            <div class="panel-wrapper sandbox-panel">
+              <HtmlSandboxPanel />
+            </div>
           </ResizablePanel>
+
+          <!-- AI 助手面板 -->
           <ResizableHandle
             v-if="isOpenAIPanel"
-            class="hidden md:block"
+            class="panel-handle"
           />
           <ResizablePanel
             v-if="isOpenAIPanel"
-            :default-size="25"
-            :min-size="20"
-            :max-size="40"
-            class="border-l"
+            :default-size="22"
+            :min-size="18"
+            :max-size="35"
           >
-            <AIAssistantSidebar />
+            <div class="panel-wrapper ai-panel">
+              <AIAssistantSidebar />
+            </div>
           </ResizablePanel>
         </ResizablePanelGroup>
       </div>
 
       <!-- 移动端浮动按钮组 -->
       <div v-if="isMobile" class="fixed bottom-16 right-6 z-50 flex flex-col gap-2">
-        <!-- 切换编辑/预览按钮 -->
         <button
-          class="bg-primary flex items-center justify-center rounded-full p-3 text-white shadow-lg transition active:scale-95 hover:scale-105 dark:bg-gray-700 dark:text-white dark:ring-2 dark:ring-white/30"
+          class="bg-primary flex items-center justify-center rounded-full p-3 text-white shadow-lg transition-all duration-200 active:scale-95 hover:scale-105 dark:bg-gray-700 dark:text-white dark:ring-2 dark:ring-white/30"
           aria-label="切换编辑/预览"
           @click="toggleView"
         >
@@ -1083,12 +1097,8 @@ onUnmounted(() => {
         </button>
       </div>
 
-      <!-- AI工具箱已移到侧边栏，这里不再显示 -->
-
       <UploadImgDialog @upload-image="uploadImage" />
-
       <InsertFormDialog />
-
       <InsertMpCardDialog />
 
       <AlertDialog v-model:open="isOpenConfirmDialog">
@@ -1107,29 +1117,131 @@ onUnmounted(() => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </main>
+    </div>
   </div>
 </template>
 
 <style lang="less" scoped>
 @import url('../assets/less/app.less');
-</style>
 
-<style lang="less" scoped>
-.container {
+/* 主应用容器 */
+.app-container {
+  display: flex;
   height: 100vh;
-  min-width: 100%;
-  padding: 0;
-}
-
-.container-main {
+  width: 100vw;
   overflow: hidden;
+  background: hsl(var(--background));
 }
 
+/* 主内容区域 - 右侧留空给左侧导航 */
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  margin-left: 80px; /* 左侧导航栏宽度 + 间距 */
+  padding: 12px 12px 12px 0;
+  position: relative;
+  min-width: 0;
+}
+
+/* 编辑器容器 */
+.editor-container {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  border-radius: 16px;
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  box-shadow:
+    0 4px 6px -1px rgb(0 0 0 / 0.1),
+    0 2px 4px -2px rgb(0 0 0 / 0.1);
+}
+
+.dark .editor-container {
+  box-shadow:
+    0 4px 6px -1px rgb(0 0 0 / 0.3),
+    0 2px 4px -2px rgb(0 0 0 / 0.2);
+}
+
+/* 面板包装器 - 统一的圆角内边距 */
+.panel-wrapper {
+  height: 100%;
+  overflow: hidden;
+  background: hsl(var(--background));
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.post-slider-panel {
+  border-right: 1px solid hsl(var(--border));
+}
+
+.sandbox-panel {
+  border-left: 1px solid hsl(var(--border));
+  background: linear-gradient(135deg, hsl(var(--background)), hsl(var(--muted) / 0.3));
+}
+
+.ai-panel {
+  border-left: 1px solid hsl(var(--border));
+  background: linear-gradient(135deg, hsl(var(--background)), hsl(var(--primary) / 0.02));
+}
+
+/* 编辑器面板 */
+.editor-panel {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+
+  .panel-wrapper {
+    border-radius: 0;
+  }
+}
+
+/* 预览面板 */
+.preview-panel {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border-left: 1px solid hsl(var(--border));
+}
+
+/* 面板分隔线手柄 */
+.panel-handle {
+  width: 4px !important;
+  background: transparent;
+  transition: background 0.2s ease;
+
+  &:hover {
+    background: hsl(var(--primary) / 0.3);
+  }
+
+  &:active {
+    background: hsl(var(--primary) / 0.5);
+  }
+}
+
+/* 模板切换按钮 */
+.template-toggle {
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  z-index: 30;
+  display: flex;
+  gap: 8px;
+}
+
+/* 预览区域样式 */
 #output-wrapper {
   position: relative;
   user-select: text;
   height: 100%;
+}
+
+.preview {
+  border-radius: 12px;
+  overflow: hidden;
 }
 
 .loading-mask {
@@ -1141,6 +1253,7 @@ onUnmounted(() => {
   text-align: center;
   color: hsl(var(--foreground));
   background-color: hsl(var(--background));
+  border-radius: 12px;
 
   .loading-mask-box {
     position: sticky;
@@ -1169,11 +1282,79 @@ onUnmounted(() => {
 .html-editor-wrapper {
   height: 100%;
   overflow: hidden;
+  border-radius: 8px;
 }
 
 .codeMirror-wrapper {
   overflow-x: hidden;
   height: 100%;
   position: relative;
+}
+
+/* 动画效果 */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.panel-wrapper {
+  animation: fadeIn 0.3s ease-out;
+}
+
+.ai-panel,
+.sandbox-panel {
+  animation: slideInRight 0.3s ease-out;
+}
+
+/* 移动端头部 */
+.mobile-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  background: hsl(var(--background));
+  border-bottom: 1px solid hsl(var(--border));
+}
+
+.main-content.has-mobile-header {
+  padding-top: 60px;
+}
+
+/* 响应式布局 */
+@media (max-width: 768px) {
+  .main-content {
+    margin-left: 0;
+    padding: 8px;
+  }
+
+  .main-content.has-mobile-header {
+    padding-top: 68px;
+  }
+
+  .editor-container {
+    border-radius: 12px;
+  }
+
+  .template-toggle {
+    display: none;
+  }
 }
 </style>

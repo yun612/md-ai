@@ -8,10 +8,15 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useEditorStore } from '@/stores/editor'
 import { useRenderStore } from '@/stores/render'
 import { generatePureHTML } from '@/utils'
 import { useHtmlEditorStore } from './useHtmlEditorStore'
+
+const props = defineProps<{
+  compact?: boolean
+}>()
 
 const emit = defineEmits<{
   modeChanged: [mode: `markdown` | `html`, convertedContent?: string]
@@ -170,7 +175,26 @@ ${convertedContent}
 </script>
 
 <template>
-  <DropdownMenu>
+  <!-- 紧凑模式 - 用于垂直侧边栏 -->
+  <template v-if="props.compact">
+    <Tooltip>
+      <TooltipTrigger as-child>
+        <button
+          class="nav-btn"
+          :class="{ active: isHtmlMode }"
+          @click="handleModeSwitch('html')"
+        >
+          <FileCode class="size-5" />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side="right">
+        <p>HTML 模式</p>
+      </TooltipContent>
+    </Tooltip>
+  </template>
+
+  <!-- 标准模式 - 用于顶部工具栏 -->
+  <DropdownMenu v-else>
     <DropdownMenuTrigger as-child>
       <Button
         variant="ghost"
@@ -185,20 +209,6 @@ ${convertedContent}
       </Button>
     </DropdownMenuTrigger>
     <DropdownMenuContent align="start">
-      <!-- <DropdownMenuItem
-        :class="{ 'bg-accent': editMode === 'markdown' }"
-        @click="handleModeSwitch('markdown')"
-      >
-        <FileText class="h-4 w-4 mr-2" />
-        <div>
-          <div class="font-medium">
-            Markdown 模式
-          </div>
-          <div class="text-xs text-muted-foreground">
-            使用 Markdown 语法编写
-          </div>
-        </div>
-      </DropdownMenuItem> -->
       <DropdownMenuItem
         :class="{ 'bg-accent': editMode === 'html' }"
         @click="handleModeSwitch('html')"
@@ -216,3 +226,30 @@ ${convertedContent}
     </DropdownMenuContent>
   </DropdownMenu>
 </template>
+
+<style scoped>
+.nav-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.nav-btn:hover {
+  color: hsl(var(--foreground));
+  background: hsl(var(--muted));
+  transform: translateY(-1px);
+}
+
+.nav-btn.active {
+  color: hsl(var(--primary));
+  background: hsl(var(--primary) / 0.1);
+}
+</style>
