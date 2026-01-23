@@ -591,8 +591,38 @@ async function startTask() {
     )
     let toolName = ``
     let toolArguments = ``
-    let currentToolCall: ApiStreamToolCall | undefined
+    const currentToolCall: ApiStreamToolCall = {
+      function: {
+        id: ``,
+        name: ``,
+        arguments: ``,
+      },
+    }
     let toolHandler: ToolHandler | undefined
+
+    const executeToolHandler = async (isPartial: boolean) => {
+      if (!toolHandler || !toolHandler.getConfig().humanInLoop) {
+        return
+      }
+      try {
+        const parsedArguments = toolArguments ? parse(toolArguments) : {}
+        const toolCallWithParsedArgs = {
+          ...currentToolCall,
+          function: {
+            ...currentToolCall.function,
+            arguments: parsedArguments,
+          },
+        }
+        await toolHandler.execute(toolCallWithParsedArgs, {
+          taskContext,
+          isPartial,
+        })
+      }
+      catch (error) {
+        console.log(`[sendMessage] parse tool arguments error:`, error)
+        console.log(`[sendMessage] toolArguments:`, toolArguments)
+      }
+    }
 
     const stream = agent.startTask(userMessage)
     // core
@@ -610,14 +640,16 @@ async function startTask() {
           lastMessage.reasoning = (lastMessage.reasoning || ``) + chunk.reasoning
         }
         else if (chunk.type === `tool_calls` && chunk.tool_call) {
-          if (currentToolCall && chunk.tool_call.function.arguments) {
+          if (chunk.tool_call.function.id) {
+            currentToolCall.function.id = chunk.tool_call.function.id
+          }
+          if (chunk.tool_call.function.name) {
+            currentToolCall.function.name = chunk.tool_call.function.name
+            toolName = chunk.tool_call.function.name
+          }
+          if (chunk.tool_call.function.arguments) {
             toolArguments += chunk.tool_call.function.arguments
             currentToolCall.function.arguments += chunk.tool_call.function.arguments
-          }
-          else {
-            currentToolCall = { ...chunk.tool_call }
-            toolName = chunk.tool_call.function.name || ``
-            toolArguments = chunk.tool_call.function.arguments || ``
           }
 
           const toolCallBlock: ContentBlock = {
@@ -637,29 +669,10 @@ async function startTask() {
             else {
               lastMessage.content.push(toolCallBlock)
             }
-            if (!toolHandler) {
+            if (!toolHandler && toolName) {
               toolHandler = tools.find(t => t.getConfig().displayName === toolName)
             }
-            if (toolHandler && toolHandler.getConfig().humanInLoop) {
-              try {
-                const parsedArguments = toolArguments ? parse(toolArguments) : {}
-                const toolCallWithParsedArgs = {
-                  ...currentToolCall,
-                  function: {
-                    ...currentToolCall.function,
-                    arguments: parsedArguments,
-                  },
-                }
-                await toolHandler.execute(toolCallWithParsedArgs, {
-                  taskContext,
-                  isPartial: true,
-                })
-              }
-              catch (error) {
-                console.log(`[sendMessage] parse tool arguments error:`, error)
-                console.log(`[sendMessage] toolArguments:`, toolArguments)
-              }
-            }
+            await executeToolHandler(true)
           }
           else {
             lastMessage.content = [toolCallBlock]
@@ -672,26 +685,7 @@ async function startTask() {
       }
     }
     // after stream
-    if (currentToolCall && toolHandler && toolHandler.getConfig().humanInLoop) {
-      try {
-        const parsedArguments = toolArguments ? parse(toolArguments) : {}
-        const toolCallWithParsedArgs = {
-          ...currentToolCall,
-          function: {
-            ...currentToolCall.function,
-            arguments: parsedArguments,
-          },
-        }
-        await toolHandler.execute(toolCallWithParsedArgs, {
-          taskContext,
-          isPartial: false,
-        })
-      }
-      catch (error) {
-        console.log(`[sendMessage] parse tool arguments error:`, error)
-        console.log(`[sendMessage] toolArguments:`, toolArguments)
-      }
-    }
+    await executeToolHandler(false)
 
     const lastIndex = messages.value.length - 1
     const lastMessage = messages.value[lastIndex]

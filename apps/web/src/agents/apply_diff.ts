@@ -42,16 +42,10 @@ export class ApplyDiffToolHandler implements ToolHandler {
     this.htmlContentGetter = htmlContentGetter || null
   }
 
-  /**
-   * 设置 Sandbox 实例
-   */
   setSandbox(sandbox: HtmlSandbox): void {
     this.sandbox = sandbox
   }
 
-  /**
-   * 设置获取 HTML 内容的函数
-   */
   setHtmlContentGetter(getter: () => string): void {
     this.htmlContentGetter = getter
   }
