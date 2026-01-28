@@ -2,6 +2,21 @@ import type {
   ISystemPromptBuilder,
 } from '@grisaiaevy/crafting-agent'
 
+const supportHtmlTags = `
+<section>
+<style>
+</style>
+</section>
+<div>
+<style>
+</style>
+</div>
+<p>
+<style>
+</style>
+</p>
+`
+
 export class SimplePromptBuilder implements ISystemPromptBuilder {
   private articalContent: string
 

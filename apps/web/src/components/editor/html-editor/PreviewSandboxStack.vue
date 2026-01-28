@@ -1,86 +1,95 @@
 <script setup lang="ts">
 /**
  * PreviewSandboxStack - 预览和沙盒垂直堆叠容器
- * 支持滚动同步，沙盒和预览保持相同大小
+ * 预览区域支持元素编辑，沙盒区域用于查看AI修改效果
  */
 import { Check, X } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 import { Button } from '@/components/ui/button'
-import { useCanvasStore } from '@/stores/canvas'
-import HtmlPreviewCore from './HtmlPreviewCore.vue'
+import HtmlElementEditBar from './HtmlElementEditBar.vue'
 import { useHtmlEditorStore } from './useHtmlEditorStore'
-import { SANDBOX_MODIFIED_ATTR, SANDBOX_MODIFIED_CLASS, useHtmlSandboxStore } from './useHtmlSandboxStore'
-import { usePreviewStyleStore } from './usePreviewStyleStore'
+import { useHtmlSandboxStore } from './useHtmlSandboxStore'
 
 const htmlEditorStore = useHtmlEditorStore()
 const htmlSandboxStore = useHtmlSandboxStore()
-const previewStyleStore = usePreviewStyleStore()
-const canvasStore = useCanvasStore()
 
 const { htmlContent } = storeToRefs(htmlEditorStore)
 const { sandboxContent, modifiedSections, isActive: isSandboxActive } = storeToRefs(htmlSandboxStore)
-const { syncScroll, previewScrollTop } = storeToRefs(canvasStore)
 
-// 组件引用
-const previewCoreRef = ref<InstanceType<typeof HtmlPreviewCore>>()
-const sandboxCoreRef = ref<InstanceType<typeof HtmlPreviewCore>>()
-
-// 滚动同步锁，防止循环触发
-const isScrolling = ref(false)
-const scrollTimeout = ref<NodeJS.Timeout>()
-
-// 处理预览滚动
-function handlePreviewScroll(e: Event) {
-  if (!syncScroll.value || isScrolling.value)
-    return
-
-  const target = e.target as HTMLElement
-  const scrollTop = target.scrollTop
-
-  canvasStore.setPreviewScrollTop(scrollTop)
-
-  // 同步到沙盒
-  if (sandboxCoreRef.value && isSandboxActive.value) {
-    isScrolling.value = true
-    sandboxCoreRef.value.scrollTo(scrollTop)
-
-    clearTimeout(scrollTimeout.value)
-    scrollTimeout.value = setTimeout(() => {
-      isScrolling.value = false
-    }, 50)
-  }
+function generateSandboxHtml(content: string): string {
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <style>
+        * {
+          margin: 0;
+          padding: 0;
+          box-sizing: border-box;
+        }
+        body {
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+          padding: 16px;
+          overflow-y: auto;
+        }
+        img {
+          max-width: 100%;
+          height: auto;
+          border-radius: 8px;
+        }
+        pre {
+          overflow-x: auto;
+          padding: 1em;
+          background: #f5f5f5;
+          border-radius: 8px;
+        }
+        code {
+          font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace;
+        }
+        /* 修改标记样式 */
+        [data-sandbox-modified] {
+          position: relative;
+          outline: 2px dashed rgba(251, 191, 36, 0.8) !important;
+          outline-offset: 4px;
+          background: linear-gradient(135deg, rgba(251, 191, 36, 0.1) 0%, rgba(245, 158, 11, 0.05) 100%) !important;
+          border-radius: 8px;
+          animation: sandboxPulse 2s ease-in-out infinite;
+        }
+        [data-sandbox-modified]::before {
+          content: '已修改';
+          position: absolute;
+          top: -10px;
+          right: -10px;
+          font-size: 10px;
+          padding: 3px 8px;
+          background: linear-gradient(135deg, #fbbf24, #f59e0b);
+          color: white;
+          border-radius: 6px;
+          font-weight: 600;
+          box-shadow: 0 2px 8px rgba(251, 191, 36, 0.3);
+          z-index: 10;
+        }
+        @keyframes sandboxPulse {
+          0%, 100% {
+            outline-color: rgba(251, 191, 36, 0.6);
+            box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.2);
+          }
+          50% {
+            outline-color: rgba(251, 191, 36, 1);
+            box-shadow: 0 0 0 4px rgba(251, 191, 36, 0.1);
+          }
+        }
+      </style>
+    </head>
+    <body>
+      ${content}
+    </body>
+    </html>
+  `
 }
 
-// 处理沙盒滚动
-function handleSandboxScroll(e: Event) {
-  if (!syncScroll.value || isScrolling.value)
-    return
-
-  const target = e.target as HTMLElement
-  const scrollTop = target.scrollTop
-
-  canvasStore.setPreviewScrollTop(scrollTop)
-
-  // 同步到预览
-  if (previewCoreRef.value) {
-    isScrolling.value = true
-    previewCoreRef.value.scrollTo(scrollTop)
-
-    clearTimeout(scrollTimeout.value)
-    scrollTimeout.value = setTimeout(() => {
-      isScrolling.value = false
-    }, 50)
-  }
-}
-
-// 应用样式到预览
-watchEffect(() => {
-  nextTick(() => {
-    previewStyleStore.applyStyles()
-  })
-})
-
-// 应用 Sandbox 内容到编辑器
 function handleApply() {
   htmlSandboxStore.applySandboxToEditor((content: string) => {
     htmlEditorStore.setHtmlContent(content)
@@ -102,32 +111,21 @@ function handleDiscard() {
   htmlSandboxStore.closeSandbox()
   toast.info(`已丢弃 Sandbox 修改`)
 }
-
-// 清理定时器
-onUnmounted(() => {
-  clearTimeout(scrollTimeout.value)
-})
 </script>
 
 <template>
   <div class="preview-sandbox-row" :class="{ 'has-sandbox': isSandboxActive }">
-    <!-- 预览区域 -->
+    <!-- 预览区域 - 支持元素编辑 -->
     <div class="row-panel preview-panel">
       <div class="panel-header">
-        <span class="panel-title">预览</span>
+        <span class="panel-title">预览（可编辑）</span>
       </div>
       <div class="panel-content">
-        <HtmlPreviewCore
-          id="html-output"
-          ref="previewCoreRef"
-          :html-content="htmlContent"
-          :readonly="true"
-          @scroll="handlePreviewScroll"
-        />
+        <HtmlElementEditBar :html-content="htmlContent" />
       </div>
     </div>
 
-    <!-- 沙盒区域 -->
+    <!-- 沙盒区域 - 只读预览 -->
     <div v-if="isSandboxActive" class="row-panel sandbox-panel">
       <div class="panel-header sandbox-header">
         <div class="header-left">
@@ -163,16 +161,12 @@ onUnmounted(() => {
         </div>
       </div>
       <div class="panel-content">
-        <HtmlPreviewCore
+        <iframe
           id="sandbox-output"
-          ref="sandboxCoreRef"
-          :html-content="sandboxContent"
-          :readonly="true"
-          :highlight-modified="true"
-          :modified-sections="modifiedSections"
-          :modified-attr="SANDBOX_MODIFIED_ATTR"
-          :modified-class="SANDBOX_MODIFIED_CLASS"
-          @scroll="handleSandboxScroll"
+          class="sandbox-iframe"
+          sandbox="allow-same-origin"
+          frameborder="0"
+          :srcdoc="generateSandboxHtml(sandboxContent)"
         />
       </div>
     </div>
@@ -259,6 +253,14 @@ onUnmounted(() => {
   flex: 1;
   min-height: 0;
   overflow: hidden;
+}
+
+.sandbox-iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: hsl(var(--background));
+  display: block;
 }
 
 /* 沙盒特殊样式 */

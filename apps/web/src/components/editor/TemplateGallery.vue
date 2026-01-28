@@ -86,21 +86,14 @@ function closeGallery() {
 
 <template>
   <div class="template-gallery h-full overflow-auto p-4">
-    <div class="mb-4 flex items-center justify-between">
-      <div>
-        <div class="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
-          <Palette class="h-4 w-4" />
-          精美模板
-        </div>
-        <p class="mt-1 text-xs text-muted-foreground">
-          生成内容后可随时切换模板，左侧快速预览
-        </p>
+    <div class="mb-4">
+      <div class="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
+        <Palette class="h-4 w-4" />
+        精美模板
       </div>
-      <div class="flex items-center gap-2">
-        <Button size="sm" variant="secondary" class="gap-1" @click="closeGallery">
-          返回编辑
-        </Button>
-      </div>
+      <p class="mt-1 text-xs text-muted-foreground">
+        生成内容后可随时切换模板，左侧快速预览
+      </p>
     </div>
 
     <div class="grid gap-3">
@@ -177,6 +170,14 @@ function closeGallery() {
     radial-gradient(circle at 10% 20%, rgba(99, 179, 237, 0.08), transparent 22%),
     radial-gradient(circle at 90% 10%, rgba(123, 97, 255, 0.08), transparent 20%),
     radial-gradient(circle at 50% 90%, rgba(196, 122, 68, 0.08), transparent 18%);
+
+  /* 隐藏滚动条但保持滚动功能 */
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+
+  &::-webkit-scrollbar {
+    display: none; /* Chrome, Safari, Opera */
+  }
 }
 
 .template-card:hover {

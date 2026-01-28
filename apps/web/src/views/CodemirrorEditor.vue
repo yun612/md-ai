@@ -9,7 +9,7 @@ import { theme as codeMirrorTheme, markdownSetup, truncateBase64Images } from '@
 import imageCompression from 'browser-image-compression'
 import { Eye, Pen } from 'lucide-vue-next'
 import AIAssistantSidebar from '@/components/ai/AIAssistantSidebar.vue'
-import { HtmlEditorView, HtmlPreviewPanel, PreviewSandboxStack, useHtmlEditorStore, useHtmlSandboxStore } from '@/components/editor/html-editor'
+import { HtmlEditorView, HtmlElementEditBar, PreviewSandboxStack, useHtmlEditorStore, useHtmlSandboxStore } from '@/components/editor/html-editor'
 import TemplateGallery from '@/components/editor/TemplateGallery.vue'
 import CanvasContainer from '@/components/layout/CanvasContainer.vue'
 import LeftNavSidebar from '@/components/layout/LeftNavSidebar.vue'
@@ -142,6 +142,12 @@ function endCopy() {
 const showEditor = ref(true)
 const showTemplateGallery = ref(false)
 
+watch(showHtmlEditor, (visible) => {
+  if (!visible && showTemplateGallery.value) {
+    showTemplateGallery.value = false
+  }
+})
+
 interface TemplateApplyPayload {
   themeKey: keyof typeof themeMap
   primaryColor: string
@@ -253,8 +259,13 @@ function ensureRenderer() {
 function toggleTemplateGallery() {
   showTemplateGallery.value = !showTemplateGallery.value
   // 确保移动端在模板模式下也能看到左侧区域
-  if (showTemplateGallery.value)
+  if (showTemplateGallery.value) {
     showEditor.value = true
+    // 在 HTML 模式下，确保编辑器面板可见以显示模板画廊
+    if (isHtmlMode.value && !showHtmlEditor.value) {
+      htmlEditorStore.toggleHtmlEditor()
+    }
+  }
 }
 
 function closeTemplateGallery() {
@@ -979,13 +990,6 @@ onUnmounted(() => {
             class="canvas-editor-panel"
           >
             <div class="canvas-panel-inner">
-              <!-- 模板画廊 -->
-              <div v-if="showTemplateGallery" class="template-toggle">
-                <Button size="sm" variant="outline" class="shadow-sm" @click="closeTemplateGallery">
-                  返回编辑
-                </Button>
-              </div>
-
               <TemplateGallery
                 v-if="showTemplateGallery"
                 :current-theme="theme"
@@ -1113,7 +1117,7 @@ onUnmounted(() => {
                         :class="[isMobile ? 'w-[100%]' : previewWidth]"
                       >
                         <section id="output" class="w-full h-full">
-                          <HtmlPreviewPanel :html-content="htmlContent" />
+                          <HtmlElementEditBar :html-content="htmlContent" />
                         </section>
                       </div>
                       <div
