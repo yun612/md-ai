@@ -6,7 +6,6 @@ import {
   AlignRight,
   Bold,
   Highlighter,
-  Image,
   Italic,
   Palette,
   Sparkles,
@@ -36,9 +35,17 @@ const isAiRefining = ref(false)
 const aiConfigStore = useAIConfigStore()
 const { endpoint, model, apiKey, temperature, maxToken, type } = storeToRefs(aiConfigStore)
 
+const FALLBACK_IMAGE_URL = `/images/sunflower.jpg`
+
+// 动画相关状态
+const isTransitioning = ref(false)
+const transitionDuration = 200 // 动画持续时间(ms)
+let transitionTimer: ReturnType<typeof setTimeout> | null = null
+
 watchEffect(() => {
   if (previewRef.value) {
-    previewRef.value.innerHTML = props.htmlContent
+    const processedHtml = replaceExternalImages(props.htmlContent)
+    previewRef.value.innerHTML = processedHtml
     nextTick(() => {
       previewStyleStore.applyStyles()
       setupElementSelection()
@@ -48,8 +55,64 @@ watchEffect(() => {
 
 let mouseUpHandler: ((e: MouseEvent) => void) | null = null
 let mouseDownHandler: ((e: MouseEvent) => void) | null = null
+let mouseMoveHandler: ((e: MouseEvent) => void) | null = null
+let clickHandler: ((e: MouseEvent) => void) | null = null
 let selectionCheckTimer: ReturnType<typeof setTimeout> | null = null
 let isSelecting = false
+let hoverTimer: ReturnType<typeof setTimeout> | null = null
+
+// 替换所有外部图片为本地图片
+function replaceExternalImages(html: string): string {
+  if (!html)
+    return html
+
+  let processedHtml = html
+  let replacedCount = 0
+
+  // 1. 替换 <img> 标签的 src 属性（排除 base64）
+  processedHtml = processedHtml.replace(
+    /<img([^>]*?)src=["']([^"']+)["']([^>]*)>/gi,
+    (match, before, src, after) => {
+      // 保留 base64 图片
+      if (src.startsWith(`data:image/`)) {
+        return match
+      }
+      replacedCount++
+      return `<img${before}src="${FALLBACK_IMAGE_URL}"${after}>`
+    },
+  )
+
+  // 2. 替换 CSS background-image（排除 base64）
+  processedHtml = processedHtml.replace(
+    /background-image:\s*url\(["']?([^"')]+)["']?\)/gi,
+    (match, url) => {
+      if (url.startsWith(`data:image/`)) {
+        return match
+      }
+      replacedCount++
+      return `background-image: url("${FALLBACK_IMAGE_URL}")`
+    },
+  )
+
+  // 3. 替换 style 属性中的 background 简写（排除 base64）
+  processedHtml = processedHtml.replace(
+    // eslint-disable-next-line regexp/no-super-linear-backtracking
+    /background:\s*([^;}"']*?)url\(["']?([^"')]+)["']?\)([^;}"']*)/gi,
+    (match, before, url, after) => {
+      if (url.startsWith(`data:image/`)) {
+        return match
+      }
+      replacedCount++
+      return `background: ${before}url("${FALLBACK_IMAGE_URL}")${after}`
+    },
+  )
+
+  if (replacedCount > 0) {
+    console.log(`[图片替换] 已替换 ${replacedCount} 张外部图片`)
+  }
+
+  return processedHtml
+}
 
 function setupElementSelection() {
   if (!previewRef.value) {
@@ -61,6 +124,12 @@ function setupElementSelection() {
   }
   if (mouseDownHandler) {
     previewRef.value.removeEventListener(`mousedown`, mouseDownHandler)
+  }
+  if (mouseMoveHandler) {
+    previewRef.value.removeEventListener(`mousemove`, mouseMoveHandler)
+  }
+  if (clickHandler) {
+    previewRef.value.removeEventListener(`click`, clickHandler)
   }
 
   if (selectionCheckTimer) {
@@ -85,8 +154,156 @@ function setupElementSelection() {
     }, 50)
   }
 
+  mouseMoveHandler = (e: MouseEvent) => {
+    // 清除之前的悬停计时器
+    if (hoverTimer) {
+      clearTimeout(hoverTimer)
+    }
+
+    // 延迟100ms后检查元素，避免过度敏感的响应
+    hoverTimer = setTimeout(() => {
+      handleElementHover(e)
+    }, 100)
+  }
+
+  clickHandler = (e: MouseEvent) => {
+    const target = e.target as HTMLElement
+
+    // 如果正在选择文本或AI聊天已打开，不处理点击
+    if (isSelecting || aiChatOpen.value) {
+      return
+    }
+
+    // 查找可编辑的HTML元素
+    let element: HTMLElement | null = target
+    while (element && element !== previewRef.value) {
+      // 检查元素是否可编辑：有文本内容或者是img/video等媒体元素
+      const hasTextContent = element.textContent?.trim() && element.textContent.trim().length > 0
+      const isMediaElement = [`IMG`, `VIDEO`, `AUDIO`, `CANVAS`, `SVG`, `IFRAME`].includes(element.tagName)
+
+      if (hasTextContent || isMediaElement) {
+        // 检查鼠标位置是否在该元素内
+        const rect = element.getBoundingClientRect()
+        if (e.clientX >= rect.left && e.clientX <= rect.right
+          && e.clientY >= rect.top && e.clientY <= rect.bottom) {
+          // 获取工具栏的实际高度
+          const estimatedToolbarHeight = 52
+          const toolbarVerticalPadding = 10
+          const toolbarHorizontalPadding = 20
+          const estimatedToolbarWidth = 380
+
+          // 计算工具栏位置
+          let x = rect.left + rect.width / 2
+          let y = rect.top - estimatedToolbarHeight - toolbarVerticalPadding
+
+          // 检查可用空间
+          const spaceAbove = rect.top - toolbarVerticalPadding
+          const spaceBelow = window.innerHeight - rect.bottom - toolbarVerticalPadding
+
+          // 如果上方空间不足且下方空间充足，则显示在元素下方
+          if (spaceAbove < estimatedToolbarHeight && spaceBelow > estimatedToolbarHeight) {
+            y = rect.bottom + toolbarVerticalPadding
+          }
+
+          // 确保工具栏不会超出屏幕横向边界
+          const minX = toolbarHorizontalPadding + estimatedToolbarWidth / 2
+          const maxX = window.innerWidth - toolbarHorizontalPadding - estimatedToolbarWidth / 2
+
+          if (x < minX)
+            x = minX
+          if (x > maxX)
+            x = maxX
+
+          // 设置工具栏位置
+          contextMenuPosition.value = { x, y }
+          selectElement(element, true)
+          contextMenuOpen.value = true
+          selectedText.value = element.textContent || ``
+          return
+        }
+      }
+      element = element.parentElement
+    }
+  }
+
   previewRef.value.addEventListener(`mousedown`, mouseDownHandler)
   previewRef.value.addEventListener(`mouseup`, mouseUpHandler)
+  previewRef.value.addEventListener(`mousemove`, mouseMoveHandler)
+  previewRef.value.addEventListener(`click`, clickHandler)
+}
+
+function handleElementHover(e: MouseEvent) {
+  const target = e.target as HTMLElement
+
+  // 如果正在选择文本或AI聊天已打开，不处理悬停
+  if (isSelecting || aiChatOpen.value) {
+    return
+  }
+
+  // 查找可编辑的HTML元素
+  let element: HTMLElement | null = target
+  while (element && element !== previewRef.value) {
+    // 检查元素是否可编辑：有文本内容或者是img/video等媒体元素
+    const hasTextContent = element.textContent?.trim() && element.textContent.trim().length > 0
+    const isMediaElement = [`IMG`, `VIDEO`, `AUDIO`, `CANVAS`, `SVG`, `IFRAME`].includes(element.tagName)
+
+    if (hasTextContent || isMediaElement) {
+      // 检查鼠标位置是否在该元素内
+      const rect = element.getBoundingClientRect()
+      if (e.clientX >= rect.left && e.clientX <= rect.right
+        && e.clientY >= rect.top && e.clientY <= rect.bottom) {
+        // 只显示高亮边框，不显示工具栏
+        if (selectedElement.value !== element || !contextMenuOpen.value) {
+          addHoverHighlight(element)
+        }
+        return
+      }
+    }
+    element = element.parentElement
+  }
+
+  // 如果没有悬停在任何元素上，清除hover高亮
+  removeHoverHighlight()
+}
+
+// 添加悬停高亮（不选中元素）
+let hoveredElement: HTMLElement | null = null
+
+function addHoverHighlight(element: HTMLElement) {
+  // 如果已经有选中的元素且工具栏打开，不覆盖
+  if (selectedElement.value && contextMenuOpen.value) {
+    return
+  }
+
+  removeHoverHighlight()
+  hoveredElement = element
+
+  // 检查是否是媒体元素，使用更明显的高亮效果
+  const isMediaElement = [`IMG`, `VIDEO`, `AUDIO`, `CANVAS`, `SVG`, `IFRAME`].includes(element.tagName)
+
+  if (isMediaElement) {
+    // 媒体元素：使用更粗、更明显的轮廓
+    element.style.outline = `2px solid rgba(59, 130, 246, 0.5)`
+    element.style.outlineOffset = `0px`
+  }
+  else {
+    // 文本元素：使用柔和效果
+    element.style.outline = `2px solid rgba(59, 130, 246, 0.4)`
+    element.style.outlineOffset = `2px`
+  }
+
+  element.style.transition = `all 0.2s ease-out`
+  element.setAttribute(`data-hover`, `true`)
+}
+
+function removeHoverHighlight() {
+  if (hoveredElement) {
+    hoveredElement.style.outline = ``
+    hoveredElement.style.outlineOffset = ``
+    hoveredElement.style.transition = ``
+    hoveredElement.removeAttribute(`data-hover`)
+    hoveredElement = null
+  }
 }
 
 function checkTextSelection() {
@@ -97,24 +314,16 @@ function checkTextSelection() {
   const selection = window.getSelection()
 
   console.log(`selection`, selection)
-  if (!selection || selection.rangeCount === 0) {
-    if (contextMenuOpen.value) {
-      contextMenuOpen.value = false
-      selectedText.value = ``
-      clearSelection()
-    }
+
+  // 如果没有文本选择
+  if (!selection || selection.rangeCount === 0 || selection.toString().trim().length === 0) {
+    // 不要关闭工具栏，因为可能是通过点击元素打开的
+    // 只清空选中的文本内容
+    selectedText.value = ``
     return
   }
 
   const selectedTextContent = selection.toString().trim()
-  if (selectedTextContent.length === 0) {
-    if (contextMenuOpen.value) {
-      contextMenuOpen.value = false
-      selectedText.value = ``
-      clearSelection()
-    }
-    return
-  }
 
   if (selectedText.value === selectedTextContent && contextMenuOpen.value) {
     return
@@ -157,28 +366,60 @@ function checkTextSelection() {
       selectElement(element)
       contextMenuOpen.value = true
     }
-    else {
-      if (contextMenuOpen.value) {
-        contextMenuOpen.value = false
-        clearSelection()
-      }
-    }
   }
   catch (e) {
     console.error(`Error in checkTextSelection:`, e)
   }
 }
 
-function selectElement(element: HTMLElement) {
+function selectElement(element: HTMLElement, animate = true) {
+  // 如果有正在进行的过渡动画，先清除
+  if (transitionTimer) {
+    clearTimeout(transitionTimer)
+    isTransitioning.value = false
+  }
+
+  // 清除hover高亮
+  removeHoverHighlight()
+
   clearSelection()
+
+  // 在位置变化前添加过渡效果
+  if (animate && contextMenuOpen.value) {
+    isTransitioning.value = true
+    transitionTimer = setTimeout(() => {
+      isTransitioning.value = false
+      transitionTimer = null
+    }, transitionDuration)
+  }
+
   selectedElement.value = element
   if (!element.getAttribute(`data-element-id`)) {
     element.setAttribute(`data-element-id`, `element-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`)
   }
-  // 应用渐变高亮效果 - 只使用 outline 和 box-shadow，不影响背景色
-  element.style.outline = `2px solid rgba(59, 130, 246, 0.6)`
-  element.style.outlineOffset = `2px`
-  element.style.boxShadow = `0 0 0 4px rgba(147, 51, 234, 0.2), inset 0 0 0 2px rgba(59, 130, 246, 0.1)`
+
+  // 为元素添加切换闪烁效果
+  element.classList.add(`element-flash`)
+  setTimeout(() => {
+    element.classList.remove(`element-flash`)
+  }, 400)
+
+  // 检查是否是媒体元素，使用更明显的高亮效果
+  const isMediaElement = [`IMG`, `VIDEO`, `AUDIO`, `CANVAS`, `SVG`, `IFRAME`].includes(element.tagName)
+
+  if (isMediaElement) {
+    // 媒体元素：使用更粗、更明显的轮廓
+    element.style.outline = `4px solid rgba(59, 130, 246, 0.9)`
+    element.style.outlineOffset = `0px`
+    element.style.boxShadow = `0 0 0 8px rgba(147, 51, 234, 0.4), 0 0 20px rgba(59, 130, 246, 0.6), inset 0 0 0 4px rgba(255, 255, 255, 0.8)`
+  }
+  else {
+    // 文本元素：使用原有的柔和效果
+    element.style.outline = `2px solid rgba(59, 130, 246, 0.6)`
+    element.style.outlineOffset = `2px`
+    element.style.boxShadow = `0 0 0 4px rgba(147, 51, 234, 0.2), inset 0 0 0 2px rgba(59, 130, 246, 0.1)`
+  }
+
   element.style.transition = `all 0.3s ease-out`
   element.setAttribute(`data-selected`, `true`)
 }
@@ -189,6 +430,7 @@ function clearSelection() {
     selectedElement.value.style.outlineOffset = ``
     selectedElement.value.style.boxShadow = ``
     selectedElement.value.style.transition = ``
+    selectedElement.value.classList.remove(`element-flash`)
     selectedElement.value.removeAttribute(`data-selected`)
   }
   selectedElement.value = null
@@ -556,12 +798,12 @@ onMounted(() => {
 
   const closeMenuHandler = (e: MouseEvent) => {
     const target = e.target as HTMLElement
-    if (!target.closest(`.custom-context-menu`) && !target.closest(`#html-output`) && !target.closest(`.ai-refine-input`)) {
-      const selection = window.getSelection()
-      if (selection && selection.toString().trim().length === 0) {
-        contextMenuOpen.value = false
-        clearSelection()
-      }
+    // 点击工具栏、预览区域或AI输入框时，不关闭工具栏
+    if (!target.closest(`.floating-style-toolbar`) && !target.closest(`#html-output`) && !target.closest(`.ai-refine-input`)) {
+      // 只有点击外部区域时才关闭
+      contextMenuOpen.value = false
+      clearSelection()
+      removeHoverHighlight()
     }
   }
 
@@ -579,9 +821,19 @@ onUnmounted(() => {
   if (mouseDownHandler && previewRef.value) {
     previewRef.value.removeEventListener(`mousedown`, mouseDownHandler)
   }
+  if (mouseMoveHandler && previewRef.value) {
+    previewRef.value.removeEventListener(`mousemove`, mouseMoveHandler)
+  }
+  if (clickHandler && previewRef.value) {
+    previewRef.value.removeEventListener(`click`, clickHandler)
+  }
   if (selectionCheckTimer) {
     clearTimeout(selectionCheckTimer)
   }
+  if (hoverTimer) {
+    clearTimeout(hoverTimer)
+  }
+  removeHoverHighlight()
   clearSelection()
 })
 </script>
@@ -605,10 +857,13 @@ onUnmounted(() => {
         <div
           v-if="contextMenuOpen"
           class="floating-style-toolbar fixed z-[200]"
+          :class="{ 'transition-all duration-300 ease-out': isTransitioning, 'will-change-transform': isTransitioning, 'toolbar-switching': isTransitioning }"
           :style="{
-            left: `${contextMenuPosition.x}px`,
-            top: `${contextMenuPosition.y}px`,
-            transform: 'translateX(-50%)',
+            'left': `${contextMenuPosition.x}px`,
+            'top': `${contextMenuPosition.y}px`,
+            'transform': 'translateX(-50%)',
+            '--tw-scale-x': isTransitioning ? '0.95' : '1',
+            '--tw-scale-y': isTransitioning ? '0.95' : '1',
           }"
           @click.stop
           @contextmenu.prevent.stop
@@ -977,6 +1232,46 @@ onUnmounted(() => {
     box-shadow:
       0 0 0 4px rgba(147, 51, 234, 0.4),
       inset 0 0 0 2px rgba(59, 130, 246, 0.2);
+  }
+}
+
+/* 工具栏切换时的动画效果 */
+.toolbar-switching {
+  animation: toolbarBounce 0.3s ease-out;
+}
+
+@keyframes toolbarBounce {
+  0% {
+    transform: translateX(-50%) scale(0.95);
+    opacity: 0.8;
+  }
+  50% {
+    transform: translateX(-50%) scale(1.05);
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(-50%) scale(1);
+    opacity: 1;
+  }
+}
+
+/* 元素切换时的闪光效果 */
+.element-flash {
+  animation: elementFlash 0.4s ease-out;
+}
+
+@keyframes elementFlash {
+  0% {
+    outline-color: rgba(251, 191, 36, 0.8);
+    box-shadow:
+      0 0 0 6px rgba(251, 191, 36, 0.3),
+      inset 0 0 0 2px rgba(251, 191, 36, 0.2);
+  }
+  100% {
+    outline-color: rgba(59, 130, 246, 0.6);
+    box-shadow:
+      0 0 0 4px rgba(147, 51, 234, 0.2),
+      inset 0 0 0 2px rgba(59, 130, 246, 0.1);
   }
 }
 </style>
