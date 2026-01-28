@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { Image as ImageType } from '@/utils/images/types'
 import imageCompression from 'browser-image-compression'
 import {
   AlignCenter,
@@ -6,6 +7,7 @@ import {
   AlignRight,
   Bold,
   Highlighter,
+  Image,
   Italic,
   Palette,
   Sparkles,
@@ -14,10 +16,16 @@ import {
   X,
 } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
+import SearchImage from '@/components/image/SearchImage.vue'
+import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { useAIConfigStore } from '@/stores/aiConfig'
 import { toBase64 } from '@/utils'
 import { fileUpload } from '@/utils/file'
 import AiRefineInput from './AiRefineInput.vue'
+import { findElementByIdInSource } from './htmlElementUtils'
+import { useHtmlEditorStore } from './useHtmlEditorStore'
 import { usePreviewStyleStore } from './usePreviewStyleStore'
 
 const props = defineProps<{
@@ -29,13 +37,19 @@ const selectedElement = ref<HTMLElement | null>(null)
 const contextMenuOpen = ref(false)
 const contextMenuPosition = ref({ x: 0, y: 0 })
 const previewStyleStore = usePreviewStyleStore()
+const htmlEditorStore = useHtmlEditorStore()
 const selectedText = ref(``)
 const aiChatOpen = ref(false)
 const isAiRefining = ref(false)
 const aiConfigStore = useAIConfigStore()
 const { endpoint, model, apiKey, temperature, maxToken, type } = storeToRefs(aiConfigStore)
 
-const FALLBACK_IMAGE_URL = `/images/sunflower.jpg`
+// 图片选择相关状态
+const imageSelectionDialogOpen = ref(false)
+const searchImageDialogOpen = ref(false)
+const currentImageAction = ref<`image` | `background`>(`image`)
+// 保存当前操作的元素引用，避免在对话框交互时被清除
+const currentOperatingElement = ref<HTMLElement | null>(null)
 
 // 动画相关状态
 const isTransitioning = ref(false)
@@ -44,12 +58,24 @@ let transitionTimer: ReturnType<typeof setTimeout> | null = null
 
 watchEffect(() => {
   if (previewRef.value) {
-    const processedHtml = replaceExternalImages(props.htmlContent)
-    previewRef.value.innerHTML = processedHtml
+    previewRef.value.innerHTML = props.htmlContent
     nextTick(() => {
       previewStyleStore.applyStyles()
       setupElementSelection()
     })
+  }
+})
+
+// 监听对话框关闭，清理保存的元素引用
+watch([imageSelectionDialogOpen, searchImageDialogOpen], ([imageDialogOpen, searchDialogOpen]) => {
+  // 当两个对话框都关闭时，清理保存的元素引用
+  if (!imageDialogOpen && !searchDialogOpen && currentOperatingElement.value) {
+    // 延迟清理，给 handleImageSelected 足够的时间执行
+    setTimeout(() => {
+      if (!imageSelectionDialogOpen.value && !searchImageDialogOpen.value) {
+        currentOperatingElement.value = null
+      }
+    }, 100)
   }
 })
 
@@ -60,59 +86,6 @@ let clickHandler: ((e: MouseEvent) => void) | null = null
 let selectionCheckTimer: ReturnType<typeof setTimeout> | null = null
 let isSelecting = false
 let hoverTimer: ReturnType<typeof setTimeout> | null = null
-
-// 替换所有外部图片为本地图片
-function replaceExternalImages(html: string): string {
-  if (!html)
-    return html
-
-  let processedHtml = html
-  let replacedCount = 0
-
-  // 1. 替换 <img> 标签的 src 属性（排除 base64）
-  processedHtml = processedHtml.replace(
-    /<img([^>]*?)src=["']([^"']+)["']([^>]*)>/gi,
-    (match, before, src, after) => {
-      // 保留 base64 图片
-      if (src.startsWith(`data:image/`)) {
-        return match
-      }
-      replacedCount++
-      return `<img${before}src="${FALLBACK_IMAGE_URL}"${after}>`
-    },
-  )
-
-  // 2. 替换 CSS background-image（排除 base64）
-  processedHtml = processedHtml.replace(
-    /background-image:\s*url\(["']?([^"')]+)["']?\)/gi,
-    (match, url) => {
-      if (url.startsWith(`data:image/`)) {
-        return match
-      }
-      replacedCount++
-      return `background-image: url("${FALLBACK_IMAGE_URL}")`
-    },
-  )
-
-  // 3. 替换 style 属性中的 background 简写（排除 base64）
-  processedHtml = processedHtml.replace(
-    // eslint-disable-next-line regexp/no-super-linear-backtracking
-    /background:\s*([^;}"']*?)url\(["']?([^"')]+)["']?\)([^;}"']*)/gi,
-    (match, before, url, after) => {
-      if (url.startsWith(`data:image/`)) {
-        return match
-      }
-      replacedCount++
-      return `background: ${before}url("${FALLBACK_IMAGE_URL}")${after}`
-    },
-  )
-
-  if (replacedCount > 0) {
-    console.log(`[图片替换] 已替换 ${replacedCount} 张外部图片`)
-  }
-
-  return processedHtml
-}
 
 function setupElementSelection() {
   if (!previewRef.value) {
@@ -436,25 +409,54 @@ function clearSelection() {
   selectedElement.value = null
 }
 
-function applyStyle(styles: Record<string, string>) {
-  if (!selectedElement.value)
+/**
+ * 应用样式到预览元素（用于颜色、字体大小等样式更新）
+ *
+ * 工作原理：
+ * 1. 通过 generateSelector 生成 CSS 选择器定位元素
+ * 2. 将样式注入到 <style id="preview-style-overrides"> 标签中
+ * 3. 样式只影响预览显示，不修改 HTML 源代码
+ *
+ * 注意：此函数仅用于预览样式更新，如需同步到源代码，需要额外调用更新函数
+ *
+ * @param styles 要应用的样式对象（如 { color: '#ff0000', fontSize: '16px' }）
+ * @param targetElement 可选的目标元素，如果不提供则使用 selectedElement
+ */
+function applyStyle(styles: Record<string, string>, targetElement?: HTMLElement) {
+  const element = targetElement || selectedElement.value
+  if (!element)
     return
 
-  const selector = previewStyleStore.generateSelector(selectedElement.value)
-  const existingOverride = previewStyleStore.getStyleForElement(selectedElement.value)
+  // 生成 CSS 选择器（使用智能定位：ID > 类名 > 位置索引）
+  const selector = previewStyleStore.generateSelector(element)
+
+  // 检查是否已有样式覆盖
+  const existingOverride = previewStyleStore.getStyleForElement(element)
 
   if (existingOverride) {
+    // 如果已存在，合并样式
     previewStyleStore.updateStyleOverride(existingOverride.id, styles)
   }
   else {
+    // 如果不存在，添加新的样式覆盖
     previewStyleStore.addStyleOverride(selector, styles)
   }
 }
 
-async function handleAddBackgroundImage() {
+function handleAddImage() {
   contextMenuOpen.value = false
-  if (!selectedElement.value)
+  const element = selectedElement.value
+  if (!element || element.tagName !== `IMG`)
     return
+
+  // 保存当前选中的元素引用
+  currentOperatingElement.value = element
+  currentImageAction.value = `image`
+  imageSelectionDialogOpen.value = true
+}
+
+function handleLocalImageUpload() {
+  imageSelectionDialogOpen.value = false
 
   const input = document.createElement(`input`)
   input.type = `file`
@@ -463,6 +465,14 @@ async function handleAddBackgroundImage() {
     const file = (e.target as HTMLInputElement).files?.[0]
     if (!file)
       return
+
+    // 使用保存的元素引用
+    const currentElement = currentOperatingElement.value as HTMLImageElement
+    if (!currentElement || currentElement.tagName !== `IMG`) {
+      toast.error(`图片不存在或元素已不存在`)
+      currentOperatingElement.value = null
+      return
+    }
 
     try {
       const useCompression = localStorage.getItem(`useCompression`) === `true`
@@ -478,19 +488,325 @@ async function handleAddBackgroundImage() {
 
       const base64Content = await toBase64(processedFile)
       const url = await fileUpload(base64Content, processedFile)
-      applyStyle({
-        backgroundImage: `url(${url})`,
-        backgroundSize: `cover`,
-        backgroundPosition: `center`,
-        backgroundRepeat: `no-repeat`,
-      })
+
+      // 更新预览中的 img src
+      currentElement.src = url
+
+      // 更新 HTML 源代码
+      updateHtmlSourceWithImage(currentElement, url)
+
+      toast.success(`图片已更新`)
+    }
+    catch (err) {
+      toast.error((err as any).message || `上传失败`)
+    }
+    finally {
+      // 清理保存的元素引用
+      currentOperatingElement.value = null
+    }
+  }
+  input.click()
+}
+
+function handleSearchImage() {
+  imageSelectionDialogOpen.value = false
+  searchImageDialogOpen.value = true
+}
+
+async function handleImageSelected(image: ImageType) {
+  searchImageDialogOpen.value = false
+
+  if (currentImageAction.value === `image`) {
+    // 使用保存的元素引用，避免因对话框交互导致 selectedElement 被清除
+    const currentElement = currentOperatingElement.value as HTMLImageElement
+    if (!currentElement || currentElement.tagName !== `IMG`) {
+      toast.error(`图片不存在或元素已不存在`)
+      currentOperatingElement.value = null
+      return
+    }
+
+    try {
+      // 使用图片的原始 URL
+      currentElement.src = image.url
+
+      // 更新 HTML 源代码
+      updateHtmlSourceWithImage(currentElement, image.url)
+
+      toast.success(`图片已更新`)
+    }
+    catch (err) {
+      toast.error((err as any).message || `更新失败`)
+    }
+    finally {
+      // 清理保存的元素引用
+      currentOperatingElement.value = null
+    }
+  }
+  else if (currentImageAction.value === `background`) {
+    // 使用保存的元素引用
+    const currentElement = currentOperatingElement.value
+    if (!currentElement) {
+      toast.error(`元素已不存在`)
+      currentOperatingElement.value = null
+      return
+    }
+
+    try {
+      const url = image.url
+
+      // 应用样式到预览
+      const imgElements = currentElement.querySelectorAll(`img`)
+
+      if (imgElements.length > 0) {
+        const selector = previewStyleStore.generateSelector(currentElement)
+        applyStyle({
+          backgroundImage: `url(${url})`,
+          backgroundSize: `cover`,
+          backgroundPosition: `center`,
+          backgroundRepeat: `no-repeat`,
+        }, currentElement)
+        const imgSelector = `${selector} img`
+        const existingImgOverride = previewStyleStore.styleOverrides.find(
+          o => o.selector === imgSelector,
+        )
+        if (existingImgOverride) {
+          previewStyleStore.updateStyleOverride(existingImgOverride.id, { display: `none` })
+        }
+        else {
+          previewStyleStore.addStyleOverride(imgSelector, { display: `none` })
+        }
+      }
+      else {
+        applyStyle({
+          backgroundImage: `url(${url})`,
+          backgroundSize: `cover`,
+          backgroundPosition: `center`,
+          backgroundRepeat: `no-repeat`,
+        }, currentElement)
+      }
+
+      // 更新 HTML 源代码
+      updateHtmlSourceWithBackgroundImage(currentElement, url)
+
+      toast.success(`背景图已添加`)
+    }
+    catch (err) {
+      toast.error((err as any).message || `更新失败`)
+    }
+    finally {
+      // 清理保存的元素引用
+      currentOperatingElement.value = null
+    }
+  }
+}
+
+function handleAddBackgroundImage() {
+  contextMenuOpen.value = false
+  const element = selectedElement.value
+  if (!element)
+    return
+
+  // 保存当前选中的元素引用
+  currentOperatingElement.value = element
+  currentImageAction.value = `background`
+  imageSelectionDialogOpen.value = true
+}
+
+function handleLocalBackgroundImageUpload() {
+  imageSelectionDialogOpen.value = false
+
+  const input = document.createElement(`input`)
+  input.type = `file`
+  input.accept = `image/*`
+  input.onchange = async (e) => {
+    const file = (e.target as HTMLInputElement).files?.[0]
+    if (!file)
+      return
+
+    // 使用保存的元素引用
+    const currentElement = currentOperatingElement.value
+    if (!currentElement) {
+      toast.error(`元素已不存在`)
+      currentOperatingElement.value = null
+      return
+    }
+
+    try {
+      const useCompression = localStorage.getItem(`useCompression`) === `true`
+      let processedFile = file
+      if (useCompression) {
+        const options = {
+          maxSizeMB: 1,
+          maxWidthOrHeight: 1920,
+          useWebWorker: true,
+        }
+        processedFile = await imageCompression(file, options)
+      }
+
+      const base64Content = await toBase64(processedFile)
+      const url = await fileUpload(base64Content, processedFile)
+
+      // 应用样式到预览（包括隐藏 img 标签）
+      const imgElements = currentElement.querySelectorAll(`img`)
+
+      // 隐藏所有 img 子元素
+      if (imgElements.length > 0) {
+        const selector = previewStyleStore.generateSelector(currentElement)
+        // 添加样式隐藏 img 标签
+        applyStyle({
+          backgroundImage: `url(${url})`,
+          backgroundSize: `cover`,
+          backgroundPosition: `center`,
+          backgroundRepeat: `no-repeat`,
+        }, currentElement)
+        // 为 img 子元素添加隐藏样式
+        const imgSelector = `${selector} img`
+        const existingImgOverride = previewStyleStore.styleOverrides.find(
+          o => o.selector === imgSelector,
+        )
+        if (existingImgOverride) {
+          previewStyleStore.updateStyleOverride(existingImgOverride.id, { display: `none` })
+        }
+        else {
+          previewStyleStore.addStyleOverride(imgSelector, { display: `none` })
+        }
+      }
+      else {
+        applyStyle({
+          backgroundImage: `url(${url})`,
+          backgroundSize: `cover`,
+          backgroundPosition: `center`,
+          backgroundRepeat: `no-repeat`,
+        }, currentElement)
+      }
+
+      // 更新 HTML 源代码
+      updateHtmlSourceWithBackgroundImage(currentElement, url)
+
       toast.success(`背景图已添加`)
     }
     catch (err) {
       toast.error((err as any).message || `上传失败`)
     }
+    finally {
+      // 清理保存的元素引用
+      currentOperatingElement.value = null
+    }
   }
   input.click()
+}
+
+/**
+ * 更新 HTML 编辑器内容
+ *
+ * @param updatedHtml 更新后的 HTML 内容
+ */
+function updateHtmlEditorContent(updatedHtml: string) {
+  // 更新编辑器内容
+  htmlEditorStore.setHtmlContent(updatedHtml)
+
+  // 更新编辑器视图（同步到 CodeMirror 编辑器）
+  if (htmlEditorStore.htmlEditor) {
+    htmlEditorStore.htmlEditor.dispatch({
+      changes: {
+        from: 0,
+        to: htmlEditorStore.htmlEditor.state.doc.length,
+        insert: updatedHtml,
+      },
+    })
+  }
+}
+
+/**
+ * 更新 HTML 源代码，将图片 URL 写入 img 标签的 src 属性
+ *
+ * @param element 预览 DOM 中选中的 img 元素
+ * @param imageUrl 上传后的图片 URL
+ */
+function updateHtmlSourceWithImage(element: HTMLImageElement, imageUrl: string) {
+  if (!htmlEditorStore.htmlEditor)
+    return
+
+  // 获取当前 HTML 内容
+  const currentHtml = htmlEditorStore.htmlContent || htmlEditorStore.htmlEditor.state.doc.toString()
+
+  // 创建临时 DOM 来解析和修改 HTML
+  const tempDiv = document.createElement(`div`)
+  tempDiv.innerHTML = currentHtml
+
+  // 定位源代码中的对应元素
+  const targetElement = findElementByIdInSource(element, tempDiv)
+
+  if (!targetElement || targetElement.tagName.toLowerCase() !== `img`) {
+    console.warn(`在源代码中找不到对应的 img 元素`)
+    return
+  }
+
+  // 更新 img src 属性
+  targetElement.setAttribute(`src`, imageUrl)
+
+  // 更新编辑器内容
+  updateHtmlEditorContent(tempDiv.innerHTML)
+}
+
+/**
+ * 更新 HTML 源代码，将背景图 URL 写入元素的 style 属性
+ *
+ * @param element 预览 DOM 中选中的元素
+ * @param imageUrl 上传后的背景图 URL
+ */
+function updateHtmlSourceWithBackgroundImage(element: HTMLElement, imageUrl: string) {
+  if (!htmlEditorStore.htmlEditor)
+    return
+
+  // 获取当前 HTML 内容
+  const currentHtml = htmlEditorStore.htmlContent || htmlEditorStore.htmlEditor.state.doc.toString()
+
+  // 创建临时 DOM 来解析和修改 HTML
+  const tempDiv = document.createElement(`div`)
+  tempDiv.innerHTML = currentHtml
+
+  // 定位源代码中的对应元素
+  const targetElement = findElementByIdInSource(element, tempDiv)
+
+  if (!targetElement) {
+    console.warn(`在源代码中找不到对应的元素`)
+    return
+  }
+
+  // 获取当前 style 属性
+  const currentStyle = targetElement.getAttribute(`style`) || ``
+
+  // 解析现有样式（保留原有样式，只更新背景图相关样式）
+  const styleObj: Record<string, string> = {}
+  if (currentStyle) {
+    currentStyle.split(`;`).forEach((rule) => {
+      const [key, value] = rule.split(`:`).map(s => s.trim())
+      if (key && value) {
+        styleObj[key] = value
+      }
+    })
+  }
+
+  // 更新背景图相关样式
+  styleObj[`background-image`] = `url(${imageUrl})`
+  styleObj[`background-size`] = `cover`
+  styleObj[`background-position`] = `center`
+  styleObj[`background-repeat`] = `no-repeat`
+
+  // 移除元素内的 img 标签（避免图裂图标显示）
+  const imgTags = targetElement.querySelectorAll(`img`)
+  imgTags.forEach(img => img.remove())
+
+  // 构建新的 style 属性
+  const newStyle = Object.entries(styleObj)
+    .map(([key, value]) => `${key}: ${value}`)
+    .join(`; `)
+
+  targetElement.setAttribute(`style`, newStyle)
+
+  // 更新编辑器内容
+  updateHtmlEditorContent(tempDiv.innerHTML)
 }
 
 function handleChangeToHeading(level: number) {
@@ -798,9 +1114,14 @@ onMounted(() => {
 
   const closeMenuHandler = (e: MouseEvent) => {
     const target = e.target as HTMLElement
-    // 点击工具栏、预览区域或AI输入框时，不关闭工具栏
-    if (!target.closest(`.floating-style-toolbar`) && !target.closest(`#html-output`) && !target.closest(`.ai-refine-input`)) {
-      // 只有点击外部区域时才关闭
+    // 点击工具栏、预览区域、AI输入框或对话框时，不关闭工具栏
+    // 当图片选择相关对话框打开时，也不清除选择
+    if (!target.closest(`.floating-style-toolbar`)
+      && !target.closest(`#html-output`)
+      && !target.closest(`.ai-refine-input`)
+      && !imageSelectionDialogOpen.value
+      && !searchImageDialogOpen.value) {
+      // 只有点击外部区域且没有对话框打开时才关闭
       contextMenuOpen.value = false
       clearSelection()
       removeHoverHighlight()
@@ -868,151 +1189,262 @@ onUnmounted(() => {
           @click.stop
           @contextmenu.prevent.stop
         >
-          <!-- 基础样式组 -->
-          <div class="toolbar-group">
-            <button
-              class="toolbar-btn"
-              title="加粗"
-              @click="handleChangeTextStyle('bold')"
-            >
-              <Bold :size="20" />
-            </button>
-            <button
-              class="toolbar-btn"
-              title="斜体"
-              @click="handleChangeTextStyle('italic')"
-            >
-              <Italic :size="20" />
-            </button>
-            <button
-              class="toolbar-btn"
-              title="下划线"
-              @click="handleChangeTextStyle('underline')"
-            >
-              <Underline :size="20" />
-            </button>
-          </div>
+          <TooltipProvider :delay-duration="200">
+            <!-- 基础样式组 -->
+            <div class="toolbar-group">
+              <Tooltip>
+                <TooltipTrigger as-child>
+                  <button
+                    class="toolbar-btn"
+                    @click="handleChangeTextStyle('bold')"
+                  >
+                    <Bold :size="20" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  加粗
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger as-child>
+                  <button
+                    class="toolbar-btn"
+                    @click="handleChangeTextStyle('italic')"
+                  >
+                    <Italic :size="20" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  斜体
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger as-child>
+                  <button
+                    class="toolbar-btn"
+                    @click="handleChangeTextStyle('underline')"
+                  >
+                    <Underline :size="20" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  下划线
+                </TooltipContent>
+              </Tooltip>
+            </div>
 
-          <div class="toolbar-divider" />
+            <div class="toolbar-divider" />
 
-          <!-- 格式组 -->
-          <div class="toolbar-group">
-            <button
-              class="toolbar-btn"
-              title="改为标题1"
-              @click="handleChangeToHeading(1)"
-            >
-              <span class="text-xs font-semibold">H1</span>
-            </button>
-            <button
-              class="toolbar-btn"
-              title="改为标题2"
-              @click="handleChangeToHeading(2)"
-            >
-              <span class="text-xs font-semibold">H2</span>
-            </button>
-            <button
-              class="toolbar-btn"
-              title="改为标题3"
-              @click="handleChangeToHeading(3)"
-            >
-              <span class="text-xs font-semibold">H3</span>
-            </button>
-          </div>
+            <!-- 格式组 -->
+            <div class="toolbar-group">
+              <Tooltip>
+                <TooltipTrigger as-child>
+                  <button
+                    class="toolbar-btn"
+                    @click="handleChangeToHeading(1)"
+                  >
+                    <span class="text-xs font-semibold">H1</span>
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  改为标题1
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger as-child>
+                  <button
+                    class="toolbar-btn"
+                    @click="handleChangeToHeading(2)"
+                  >
+                    <span class="text-xs font-semibold">H2</span>
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  改为标题2
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger as-child>
+                  <button
+                    class="toolbar-btn"
+                    @click="handleChangeToHeading(3)"
+                  >
+                    <span class="text-xs font-semibold">H3</span>
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  改为标题3
+                </TooltipContent>
+              </Tooltip>
+            </div>
 
-          <div class="toolbar-divider" />
+            <div class="toolbar-divider" />
 
-          <!-- 字号组 -->
-          <div class="toolbar-group">
-            <button
-              class="toolbar-btn"
-              title="增大字号"
-              @click="handleChangeTextStyle('large')"
-            >
-              <TypeOutline :size="20" class="scale-125" />
-            </button>
-            <button
-              class="toolbar-btn"
-              title="减小字号"
-              @click="handleChangeTextStyle('small')"
-            >
-              <TypeOutline :size="20" class="scale-75" />
-            </button>
-          </div>
+            <!-- 字号组 -->
+            <div class="toolbar-group">
+              <Tooltip>
+                <TooltipTrigger as-child>
+                  <button
+                    class="toolbar-btn"
+                    @click="handleChangeTextStyle('large')"
+                  >
+                    <TypeOutline :size="20" class="scale-125" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  增大字号
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger as-child>
+                  <button
+                    class="toolbar-btn"
+                    @click="handleChangeTextStyle('small')"
+                  >
+                    <TypeOutline :size="20" class="scale-75" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  减小字号
+                </TooltipContent>
+              </Tooltip>
+            </div>
 
-          <div class="toolbar-divider" />
+            <div class="toolbar-divider" />
 
-          <!-- 对齐组 -->
-          <div class="toolbar-group">
-            <button
-              class="toolbar-btn"
-              title="左对齐"
-              @click="handleChangeTextStyle('left')"
-            >
-              <AlignLeft :size="20" />
-            </button>
-            <button
-              class="toolbar-btn"
-              title="居中"
-              @click="handleChangeTextStyle('center')"
-            >
-              <AlignCenter :size="20" />
-            </button>
-            <button
-              class="toolbar-btn"
-              title="右对齐"
-              @click="handleChangeTextStyle('right')"
-            >
-              <AlignRight :size="20" />
-            </button>
-          </div>
+            <!-- 对齐组 -->
+            <div class="toolbar-group">
+              <Tooltip>
+                <TooltipTrigger as-child>
+                  <button
+                    class="toolbar-btn"
+                    @click="handleChangeTextStyle('left')"
+                  >
+                    <AlignLeft :size="20" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  左对齐
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger as-child>
+                  <button
+                    class="toolbar-btn"
+                    @click="handleChangeTextStyle('center')"
+                  >
+                    <AlignCenter :size="20" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  居中
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger as-child>
+                  <button
+                    class="toolbar-btn"
+                    @click="handleChangeTextStyle('right')"
+                  >
+                    <AlignRight :size="20" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  右对齐
+                </TooltipContent>
+              </Tooltip>
+            </div>
 
-          <div class="toolbar-divider" />
+            <div class="toolbar-divider" />
 
-          <!-- 颜色和样式组 -->
-          <div class="toolbar-group">
-            <button
-              class="toolbar-btn"
-              title="文字颜色"
-              @click="handleChangeColor"
-            >
-              <Palette :size="20" />
-            </button>
-            <button
-              class="toolbar-btn"
-              title="背景颜色"
-              @click="handleChangeBackgroundColor"
-            >
-              <Highlighter :size="20" />
-            </button>
-            <button
-              class="toolbar-btn"
-              title="添加背景图"
-              @click="handleAddBackgroundImage"
-            >
-              <Image :size="20" />
-            </button>
-          </div>
+            <!-- 颜色和样式组 -->
+            <div class="toolbar-group">
+              <Tooltip>
+                <TooltipTrigger as-child>
+                  <button
+                    class="toolbar-btn"
+                    @click="handleChangeColor"
+                  >
+                    <Palette :size="20" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  文字颜色
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger as-child>
+                  <button
+                    class="toolbar-btn"
+                    @click="handleChangeBackgroundColor"
+                  >
+                    <Highlighter :size="20" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  背景颜色
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip v-if="selectedElement?.tagName === 'IMG'">
+                <TooltipTrigger as-child>
+                  <button
+                    class="toolbar-btn"
+                    @click="handleAddImage"
+                  >
+                    <Image :size="20" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  添加图片
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger as-child>
+                  <button
+                    class="toolbar-btn"
+                    @click="handleAddBackgroundImage"
+                  >
+                    <Image :size="20" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  添加背景图
+                </TooltipContent>
+              </Tooltip>
+            </div>
 
-          <div class="toolbar-divider" />
+            <div class="toolbar-divider" />
 
-          <!-- AI 和其他组 -->
-          <div class="toolbar-group">
-            <button
-              class="toolbar-btn toolbar-btn-primary"
-              title="AI 修改"
-              @click="handleOpenAiChat"
-            >
-              <Sparkles :size="20" />
-            </button>
-            <button
-              class="toolbar-btn toolbar-btn-danger"
-              title="移除样式"
-              @click="handleRemoveStyle"
-            >
-              <X :size="20" />
-            </button>
-          </div>
+            <!-- AI 和其他组 -->
+            <div class="toolbar-group">
+              <Tooltip>
+                <TooltipTrigger as-child>
+                  <button
+                    class="toolbar-btn toolbar-btn-primary"
+                    @click="handleOpenAiChat"
+                  >
+                    <Sparkles :size="20" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  AI 修改
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger as-child>
+                  <button
+                    class="toolbar-btn toolbar-btn-danger"
+                    @click="handleRemoveStyle"
+                  >
+                    <X :size="20" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  移除样式
+                </TooltipContent>
+              </Tooltip>
+            </div>
+          </TooltipProvider>
         </div>
       </Transition>
     </Teleport>
@@ -1050,6 +1482,58 @@ onUnmounted(() => {
         />
       </div>
     </Teleport>
+
+    <!-- 图片选择方式弹窗 -->
+    <Dialog v-model:open="imageSelectionDialogOpen">
+      <DialogContent class="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>选择图片来源</DialogTitle>
+          <DialogDescription>
+            你可以从本地上传图片，或者搜索在线图片
+          </DialogDescription>
+        </DialogHeader>
+        <div class="grid gap-4 py-4">
+          <Button
+            variant="outline"
+            class="w-full h-20 text-base"
+            @click="currentImageAction === 'image' ? handleLocalImageUpload() : handleLocalBackgroundImageUpload()"
+          >
+            <div class="flex flex-col items-center gap-2">
+              <Image :size="24" />
+              <span>从本地上传</span>
+            </div>
+          </Button>
+          <Button
+            variant="outline"
+            class="w-full h-20 text-base"
+            @click="handleSearchImage"
+          >
+            <div class="flex flex-col items-center gap-2">
+              <svg
+                class="w-6 h-6"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                />
+              </svg>
+              <span>搜索在线图片</span>
+            </div>
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+
+    <!-- 搜索图片弹窗 -->
+    <SearchImage
+      v-model:visible="searchImageDialogOpen"
+      @select="handleImageSelected"
+    />
   </div>
 </template>
 

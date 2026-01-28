@@ -11,7 +11,7 @@ export class UnsplashProvider implements ImageProvider {
   }
 
   async search(options: SearchOptions): Promise<Image[]> {
-    const { keyword, count = 10, page = 1, orientation = `all` } = options
+    const { keyword, count = 10, page = 1, orientation = `landscape` } = options
 
     try {
       const response = await axios.get(`${this.baseUrl}/search/photos`, {

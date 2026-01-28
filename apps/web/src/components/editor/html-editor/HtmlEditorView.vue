@@ -26,55 +26,6 @@ let editorView: EditorView | null = null
 
 const themeCompartment = new Compartment()
 
-// 本地替代图片
-const FALLBACK_IMAGE_URL = `/images/sunflower.jpg`
-
-// 替换所有外部图片为本地图片
-function replaceExternalImages(html: string): string {
-  if (!html)
-    return html
-
-  let processedHtml = html
-
-  // 1. 替换 <img> 标签的 src 属性（排除 base64）
-  processedHtml = processedHtml.replace(
-    /<img([^>]*?)src=["']([^"']+)["']([^>]*)>/gi,
-    (match, before, src, after) => {
-      if (src.startsWith(`data:image/`)) {
-        return match
-      }
-      console.log(`[粘贴时替换图片]`, src, `→`, FALLBACK_IMAGE_URL)
-      return `<img${before}src="${FALLBACK_IMAGE_URL}"${after}>`
-    },
-  )
-
-  // 2. 替换 CSS background-image（排除 base64）
-  processedHtml = processedHtml.replace(
-    /background-image:\s*url\(["']?([^"')]+)["']?\)/gi,
-    (match, url) => {
-      if (url.startsWith(`data:image/`)) {
-        return match
-      }
-      console.log(`[粘贴时替换背景图片]`, url, `→`, FALLBACK_IMAGE_URL)
-      return `background-image: url("${FALLBACK_IMAGE_URL}")`
-    },
-  )
-
-  // 3. 替换 style 属性中的 background 简写（排除 base64）
-  processedHtml = processedHtml.replace(
-    // eslint-disable-next-line regexp/no-super-linear-backtracking
-    /background:\s*([^;}"']*?)url\(["']?([^"')]+)["']?\)([^;}"']*)/gi,
-    (match, before, url, after) => {
-      if (url.startsWith(`data:image/`)) {
-        return match
-      }
-      return `background: ${before}url("${FALLBACK_IMAGE_URL}")${after}`
-    },
-  )
-
-  return processedHtml
-}
-
 function getInitialContent(): string {
   if (props.initialContent) {
     return props.initialContent
@@ -107,33 +58,6 @@ onMounted(() => {
         }
       }),
       EditorView.lineWrapping,
-      EditorView.domEventHandlers({
-        paste(event, view) {
-          // 获取粘贴的文本内容
-          const pastedText = event.clipboardData?.getData(`text/html`)
-            || event.clipboardData?.getData(`text/plain`)
-
-          if (pastedText) {
-            // 替换外部图片
-            const processedText = replaceExternalImages(pastedText)
-
-            // 如果有替换，阻止默认行为并插入处理后的内容
-            if (processedText !== pastedText) {
-              event.preventDefault()
-
-              const { from, to } = view.state.selection.main
-              view.dispatch({
-                changes: { from, to, insert: processedText },
-                selection: { anchor: from + processedText.length },
-              })
-
-              return true
-            }
-          }
-
-          return false
-        },
-      }),
     ],
   })
 

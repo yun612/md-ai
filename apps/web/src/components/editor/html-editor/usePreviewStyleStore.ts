@@ -1,5 +1,6 @@
 import { useDebounceFn, useStorage } from '@vueuse/core'
 import { addPrefix } from '@/utils'
+import { generateElementSelector } from './htmlElementUtils'
 
 export interface StyleOverride {
   selector: string
@@ -126,63 +127,23 @@ export const usePreviewStyleStore = defineStore(`previewStyle`, () => {
     }) || null
   }
 
+  /**
+   * 生成 CSS 选择器用于定位元素
+   *
+   * 使用 ID 定位：所有元素都有唯一 ID（由外部逻辑保证）
+   *
+   * @param element 要定位的元素
+   * @returns CSS 选择器字符串，格式为 `#html-output #elementId`
+   */
   function generateSelector(element: HTMLElement): string {
+    // 使用缓存避免重复计算
     if (selectorCache.has(element)) {
       return selectorCache.get(element)!
     }
 
-    try {
-      if (element.id && element.id !== `html-output`) {
-        const selector = `#html-output #${element.id}`
-        selectorCache.set(element, selector)
-        return selector
-      }
-
-      const path: string[] = []
-      let current: HTMLElement | null = element
-      const htmlOutput = element.closest(`#html-output`)
-
-      if (!htmlOutput) {
-        throw new Error(`Element is not within #html-output`)
-      }
-
-      while (current && current !== htmlOutput && current !== document.body) {
-        let selector = current.tagName.toLowerCase()
-
-        if (current.className && typeof current.className === `string`) {
-          const classes = Array.from(current.classList || [])
-            .filter(cls =>
-              !cls.startsWith(`md-`)
-              && !cls.startsWith(`preview-`)
-              && cls !== `html-preview-content`,
-            )
-          if (classes.length > 0) {
-            selector += `.${classes.join(`.`)}`
-          }
-        }
-
-        const parent = current.parentElement
-        if (parent) {
-          const siblings = Array.from(parent.children)
-            .filter(el => el.tagName === current!.tagName)
-          if (siblings.length > 1) {
-            const index = siblings.indexOf(current) + 1
-            selector += `:nth-of-type(${index})`
-          }
-        }
-
-        path.unshift(selector)
-        current = current.parentElement
-      }
-
-      const finalSelector = `#html-output ${path.join(` > `)}`
-      selectorCache.set(element, finalSelector)
-      return finalSelector
-    }
-    catch (error) {
-      console.warn(`Failed to generate selector:`, error)
-      return `#html-output *`
-    }
+    const selector = generateElementSelector(element)
+    selectorCache.set(element, selector)
+    return selector
   }
 
   return {

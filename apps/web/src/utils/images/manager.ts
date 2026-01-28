@@ -33,32 +33,42 @@ export class ImageManager {
   private initializeProviders(config: ImageManagerConfig) {
     const { providers = {} } = config
 
-    if (providers.unsplash) {
-      this.providers.set(`unsplash`, new UnsplashProvider(providers.unsplash))
+    const unsplashKey = providers.unsplash || import.meta.env.VITE_UNSPLASH_API_KEY
+    const pexelsKey = providers.pexels || import.meta.env.VITE_PEXELS_API_KEY
+    const pixabayKey = providers.pixabay || import.meta.env.VITE_PIXABAY_API_KEY
+    const flickrKey = providers.flickr || import.meta.env.VITE_FLICKR_API_KEY
+    const istockKey = providers.istock || import.meta.env.VITE_ISTOCK_API_KEY
+    const shutterstockKey = providers.shutterstock || import.meta.env.VITE_SHUTTERSTOCK_API_KEY
+    const gettyImagesKey = providers.gettyImages || import.meta.env.VITE_GETTY_IMAGES_API_KEY
+    const visualhuntKey = providers.visualhunt || import.meta.env.VITE_VISUALHUNT_API_KEY
+    const freeimagesKey = providers.freeimages || import.meta.env.VITE_FREEIMAGES_API_KEY
+
+    if (unsplashKey) {
+      this.providers.set(`unsplash`, new UnsplashProvider(unsplashKey))
     }
-    if (providers.pexels) {
-      this.providers.set(`pexels`, new PexelsProvider(providers.pexels))
+    if (pexelsKey) {
+      this.providers.set(`pexels`, new PexelsProvider(pexelsKey))
     }
-    if (providers.pixabay) {
-      this.providers.set(`pixabay`, new PixabayProvider(providers.pixabay))
+    if (pixabayKey) {
+      this.providers.set(`pixabay`, new PixabayProvider(pixabayKey))
     }
-    if (providers.flickr) {
-      this.providers.set(`flickr`, new FlickrProvider(providers.flickr))
+    if (flickrKey) {
+      this.providers.set(`flickr`, new FlickrProvider(flickrKey))
     }
-    if (providers.istock) {
-      this.providers.set(`istock`, new IStockProvider(providers.istock))
+    if (istockKey) {
+      this.providers.set(`istock`, new IStockProvider(istockKey))
     }
-    if (providers.shutterstock) {
-      this.providers.set(`shutterstock`, new ShutterstockProvider(providers.shutterstock))
+    if (shutterstockKey) {
+      this.providers.set(`shutterstock`, new ShutterstockProvider(shutterstockKey))
     }
-    if (providers.gettyImages) {
-      this.providers.set(`gettyImages`, new GettyImagesProvider(providers.gettyImages))
+    if (gettyImagesKey) {
+      this.providers.set(`gettyImages`, new GettyImagesProvider(gettyImagesKey))
     }
-    if (providers.visualhunt) {
-      this.providers.set(`visualhunt`, new VisualhuntProvider(providers.visualhunt))
+    if (visualhuntKey) {
+      this.providers.set(`visualhunt`, new VisualhuntProvider(visualhuntKey))
     }
-    if (providers.freeimages) {
-      this.providers.set(`freeimages`, new FreeImagesProvider(providers.freeimages))
+    if (freeimagesKey) {
+      this.providers.set(`freeimages`, new FreeImagesProvider(freeimagesKey))
     }
   }
 
