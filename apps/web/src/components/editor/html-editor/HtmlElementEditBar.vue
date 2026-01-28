@@ -286,8 +286,6 @@ function checkTextSelection() {
 
   const selection = window.getSelection()
 
-  console.log(`selection`, selection)
-
   // 如果没有文本选择
   if (!selection || selection.rangeCount === 0 || selection.toString().trim().length === 0) {
     // 不要关闭工具栏，因为可能是通过点击元素打开的

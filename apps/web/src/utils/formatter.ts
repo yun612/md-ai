@@ -110,7 +110,6 @@ export async function formatHtml(content: string): Promise<string> {
   try {
     // 1. 先为元素添加 ID（在 prettier 之前）
     const withIds = addIdsToHtmlElements(content)
-    console.log(`withIds`, withIds)
     // 2. 使用 Prettier 格式化
     const formatted = await prettierFormat(withIds)
 

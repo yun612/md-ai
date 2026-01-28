@@ -1,4 +1,4 @@
-export { default as HtmlEditorToolbar } from './HtmlEditorToolbar.vue'
+export { default as HtmlMarkdownConverter } from '../HtmlMarkdownConverter.vue'
 export { default as HtmlEditorView } from './HtmlEditorView.vue'
 export { default as HtmlElementEditBar } from './HtmlElementEditBar.vue'
 export { default as PreviewSandboxStack } from './PreviewSandboxStack.vue'

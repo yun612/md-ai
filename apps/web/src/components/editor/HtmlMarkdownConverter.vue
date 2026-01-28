@@ -12,7 +12,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { useEditorStore } from '@/stores/editor'
 import { useRenderStore } from '@/stores/render'
 import { generatePureHTML } from '@/utils'
-import { useHtmlEditorStore } from './useHtmlEditorStore'
+import { useHtmlEditorStore } from './html-editor/useHtmlEditorStore'
 
 const props = defineProps<{
   compact?: boolean

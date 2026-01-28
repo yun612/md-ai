@@ -261,7 +261,8 @@ function toggleTemplateGallery() {
   // 确保移动端在模板模式下也能看到左侧区域
   if (showTemplateGallery.value) {
     showEditor.value = true
-    // 在 HTML 模式下，确保编辑器面板可见以显示模板画廊
+    // 在 HTML 模式下，模板画廊需要编辑器面板可见才能显示
+    // 所以如果编辑器被隐藏了，需要先显示它
     if (isHtmlMode.value && !showHtmlEditor.value) {
       htmlEditorStore.toggleHtmlEditor()
     }
@@ -1024,7 +1025,6 @@ onUnmounted(() => {
 
         <!-- CSS 编辑器和右侧滑块 -->
         <CssEditor />
-        <RightSlider />
       </CanvasContainer>
     </template>
 
@@ -1146,7 +1146,6 @@ onUnmounted(() => {
               </div>
 
               <CssEditor />
-              <RightSlider />
             </ResizablePanel>
 
             <!-- AI 助手面板 -->

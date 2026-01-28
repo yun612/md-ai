@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Bot, ChevronDownIcon, Eye, EyeOff, Menu, Palette, SlidersHorizontal } from 'lucide-vue-next'
-import { HtmlEditorToolbar, useHtmlEditorStore } from '@/components/editor/html-editor'
+import { HtmlMarkdownConverter, useHtmlEditorStore } from '@/components/editor/html-editor'
 import { usePreviewStyleStore } from '@/components/editor/html-editor/usePreviewStyleStore'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useDisplayStore } from '@/stores/display'
@@ -360,7 +360,7 @@ async function copy() {
         <StyleDropdown />
         <HelpDropdown @open-about="handleOpenAbout" @open-fund="handleOpenFund" />
       </Menubar>
-      <HtmlEditorToolbar class="ml-2" @mode-changed="handleModeChanged" />
+      <HtmlMarkdownConverter class="ml-2" @mode-changed="handleModeChanged" />
     </div>
 
     <!-- 移动端汉堡菜单按钮 -->

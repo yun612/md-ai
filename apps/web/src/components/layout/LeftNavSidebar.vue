@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Bot, Copy, Eye, EyeOff, FileText, HelpCircle, Palette, SlidersHorizontal, Sparkles, Type } from 'lucide-vue-next'
+import { Bot, Copy, Eye, EyeOff, FileText, HelpCircle, Palette, SlidersHorizontal, Sparkles } from 'lucide-vue-next'
 import { useHtmlEditorStore } from '@/components/editor/html-editor'
 import { usePreviewStyleStore } from '@/components/editor/html-editor/usePreviewStyleStore'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -21,7 +21,6 @@ const renderStore = useRenderStore()
 const uiStore = useUIStore()
 const exportStore = useExportStore()
 const displayStore = useDisplayStore()
-const aiConfigStore = useAIConfigStore()
 const htmlEditorStore = useHtmlEditorStore()
 const previewStyleStore = usePreviewStyleStore()
 
@@ -31,6 +30,59 @@ const { primaryColor } = storeToRefs(themeStore)
 const { isOpenRightSlider, isOpenAIPanel, isOpenPostSlider } = storeToRefs(uiStore)
 const { toggleAIPanel, togglePostSlider } = uiStore
 const { isHtmlMode, showHtmlEditor } = storeToRefs(htmlEditorStore)
+
+const activePanel = ref<string | null>(null)
+
+// 处理『文档管理』按钮点击
+function handleDocumentClick() {
+  const isCurrentlyActive = activePanel.value === `document`
+
+  // 关闭模板库
+  if (activePanel.value === `template`)
+    emit(`toggleTemplateGallery`)
+
+  // 切换文档管理面板和激活状态
+  if (isCurrentlyActive) {
+    activePanel.value = null
+    if (isOpenPostSlider.value)
+      togglePostSlider()
+  }
+  else {
+    activePanel.value = `document`
+    if (!isOpenPostSlider.value)
+      togglePostSlider()
+  }
+}
+
+// 处理『精美模板』按钮点击
+function handleTemplateClick() {
+  const isCurrentlyActive = activePanel.value === `template`
+
+  // 关闭文档管理
+  if (activePanel.value === `document` && isOpenPostSlider.value)
+    togglePostSlider()
+
+  // 更新激活状态并触发模板库切换
+  activePanel.value = isCurrentlyActive ? null : `template`
+  emit(`toggleTemplateGallery`)
+}
+
+// 处理『隐藏代码』按钮点击
+function handleCodeToggleClick() {
+  // 关闭文档管理
+  if (activePanel.value === `document` && isOpenPostSlider.value)
+    togglePostSlider()
+
+  // 关闭模板库
+  if (activePanel.value === `template`)
+    emit(`toggleTemplateGallery`)
+
+  // 清除激活状态
+  activePanel.value = null
+
+  // 切换编辑器显示状态
+  htmlEditorStore.toggleHtmlEditor()
+}
 
 // Editor refresh function
 function editorRefresh() {
@@ -259,8 +311,8 @@ function toggleTemplateGallery() {
             <TooltipTrigger as-child>
               <button
                 class="nav-btn"
-                :class="{ active: isOpenPostSlider }"
-                @click="togglePostSlider()"
+                :class="{ active: activePanel === 'document' }"
+                @click="handleDocumentClick"
               >
                 <FileText class="size-5" />
               </button>
@@ -273,7 +325,11 @@ function toggleTemplateGallery() {
           <!-- 模板库 -->
           <Tooltip>
             <TooltipTrigger as-child>
-              <button class="nav-btn" @click="toggleTemplateGallery">
+              <button
+                class="nav-btn"
+                :class="{ active: activePanel === 'template' }"
+                @click="handleTemplateClick"
+              >
                 <Palette class="size-5" />
               </button>
             </TooltipTrigger>
@@ -282,8 +338,21 @@ function toggleTemplateGallery() {
             </TooltipContent>
           </Tooltip>
 
-          <!-- 编辑器格式切换 -->
-          <!-- <HtmlEditorToolbar :compact="true" @mode-changed="handleModeChanged" /> -->
+          <!-- HTML编辑器显示/隐藏 -->
+          <Tooltip v-if="isHtmlMode">
+            <TooltipTrigger as-child>
+              <button
+                class="nav-btn"
+                @click="handleCodeToggleClick"
+              >
+                <EyeOff v-if="showHtmlEditor" class="size-5" />
+                <Eye v-else class="size-5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="right">
+              <p>{{ showHtmlEditor ? '隐藏代码' : '显示代码' }}</p>
+            </TooltipContent>
+          </Tooltip>
 
           <Separator class="my-2 opacity-30" />
 
@@ -315,35 +384,6 @@ function toggleTemplateGallery() {
         <!-- 底部工具 -->
         <div class="nav-footer">
           <Separator class="my-2 opacity-30" />
-
-          <!-- 样式面板 -->
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <button
-                class="nav-btn"
-                :class="{ active: isOpenRightSlider }"
-                @click="isOpenRightSlider = !isOpenRightSlider"
-              >
-                <Type class="size-5" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="right">
-              <p>样式设置</p>
-            </TooltipContent>
-          </Tooltip>
-
-          <!-- HTML编辑器显示/隐藏 -->
-          <Tooltip v-if="isHtmlMode">
-            <TooltipTrigger as-child>
-              <button class="nav-btn" @click="htmlEditorStore.toggleHtmlEditor()">
-                <EyeOff v-if="showHtmlEditor" class="size-5" />
-                <Eye v-else class="size-5" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="right">
-              <p>{{ showHtmlEditor ? '隐藏代码' : '显示代码' }}</p>
-            </TooltipContent>
-          </Tooltip>
 
           <!-- AI助手 -->
           <Tooltip>
